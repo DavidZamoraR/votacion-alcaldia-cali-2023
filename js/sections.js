@@ -31,19 +31,19 @@ function activateSection(index) {
   }
 }
 
+// 📌 Funciones placeholder: aquí luego meterás gráficos D3
+
 function showIntro() {
-  console.log("👉 Intro (sección 0) activada");
+  console.log("📊 Intro: texto general de las elecciones en Cali");
 }
 
 function showMapaComunas() {
-  console.log("🗺️ Mapa comunas (sección 1)");
+  console.log("🗺️ Mostrar mapa de Cali por comunas");
 }
 
-function showColorearComunas() {
-  console.log("🎨 Colorear comunas (sección 2)");
+function showColoresPorCandidato() {
+  console.log("🎨 Colorear comunas según candidato ganador");
 }
-
-// 📌 Funciones placeholder: aquí luego meterás gráficos D3
 
 function showResultadosPorPuesto() {
   d3.select("#vis").html(""); // limpiar antes de dibujar
@@ -52,58 +52,47 @@ function showResultadosPorPuesto() {
   const barHeight = 25;
 
   d3.csv("data/votos.csv").then(data => {
+    console.log("Ejemplo de fila:", data[0]); // debug cabeceras
+
     // convertir a número
     data.forEach(d => {
-      d.eder = +d["ALVARO ALEJANDRO EDER GARCES"];
-      d.ortiz = +d["ROBERTO ORTIZ URUEÑA"];
-      d.renteria = +d["DANIS ANTONIO RENTERIA CHALA"];
-      d.resto = +d["TOTAL_VOTOS"] - (d.eder + d.ortiz + d.renteria);
+      d.TOTAL_VOTOS = +d["TOTAL_VOTOS"];
     });
 
-    // claves para la pila
-    const keys = ["eder", "ortiz", "renteria", "resto"];
-
-    // colores
-    const color = d3.scaleOrdinal()
-      .domain(keys)
-      .range([
-        "#FFD700", // Eder
-        "#FF0000", // Ortiz
-        "#800080", // Rentería
-        "#A9A9A9"  // Otros
-      ]);
-
-    // crear pila
-    const stack = d3.stack().keys(keys);
-    const series = stack(data);
-
-    // escala horizontal proporcional a votos
+    // escala horizontal (votos → ancho de barra)
     const x = d3.scaleLinear()
-      .domain([0, d3.max(data, d => d["TOTAL_VOTOS"])])
+      .domain([0, d3.max(data, d => d.TOTAL_VOTOS)])
       .range([0, width - 200]);
+
+    // 🎨 escala de colores binaria (solo dos ganadores)
+    const color = d3.scaleOrdinal()
+      .domain([
+        "ALVARO ALEJANDRO EDER GARCES",
+        "ROBERTO ORTIZ URUEÑA"
+      ])
+      .range([
+        "#FFD700", // amarillo → Eder
+        "#FF0000"  // rojo → Ortiz
+      ]);
 
     // crear SVG
     const svg = d3.select("#vis")
       .append("svg")
       .attr("width", width)
-      .attr("height", barHeight * data.length + 80);
+      .attr("height", barHeight * data.length + 60);
 
-    // dibujar capas apiladas
-    svg.selectAll("g.layer")
-      .data(series)
-      .enter()
-      .append("g")
-      .attr("fill", d => color(d.key))
-      .selectAll("rect")
-      .data(d => d)
+    // 📊 dibujar barras
+    svg.selectAll("rect")
+      .data(data)
       .enter()
       .append("rect")
-      .attr("x", d => 150 + x(d[0]))            // inicio acumulado
+      .attr("x", 150)
       .attr("y", (d, i) => i * barHeight)
-      .attr("width", d => x(d[1]) - x(d[0]))    // diferencia acumulada
-      .attr("height", barHeight - 4);
+      .attr("width", d => x(d.TOTAL_VOTOS))
+      .attr("height", barHeight - 4)
+      .attr("fill", d => color(d["gana"]));
 
-    // etiquetas de puestos
+    // etiquetas de texto (nombres de puestos)
     svg.selectAll("text.label")
       .data(data)
       .enter()
@@ -115,19 +104,28 @@ function showResultadosPorPuesto() {
       .attr("text-anchor", "end")
       .text(d => d["nom_puesto"]);
 
-    // leyenda
+    // etiquetas de valores (total votos)
+    svg.selectAll("text.value")
+      .data(data)
+      .enter()
+      .append("text")
+      .attr("class", "value")
+      .attr("x", d => 150 + x(d.TOTAL_VOTOS) + 5)
+      .attr("y", (d, i) => i * barHeight + barHeight / 2)
+      .attr("dy", ".35em")
+      .text(d => d.TOTAL_VOTOS);
+
+    // 🎨 Leyenda simple
     const legend = svg.append("g")
       .attr("transform", `translate(0, ${barHeight * data.length + 20})`);
 
     const legendData = [
-      { key: "eder", label: "Eder", color: "#FFD700" },
-      { key: "ortiz", label: "Ortiz", color: "#FF0000" },
-      { key: "renteria", label: "Rentería", color: "#800080" },
-      { key: "resto", label: "Otros", color: "#A9A9A9" }
+      { candidato: "ALVARO ALEJANDRO EDER GARCES", color: "#FFD700" },
+      { candidato: "ROBERTO ORTIZ URUEÑA", color: "#FF0000" }
     ];
 
     legendData.forEach((d, i) => {
-      const g = legend.append("g").attr("transform", `translate(${i * 120},0)`);
+      const g = legend.append("g").attr("transform", `translate(${i * 250},0)`);
 
       g.append("rect")
         .attr("width", 14)
@@ -138,12 +136,10 @@ function showResultadosPorPuesto() {
         .attr("x", 20)
         .attr("y", 12)
         .attr("font-size", "12px")
-        .text(d.label);
+        .text(d.candidato);
     });
   });
 }
-
-
 
 
 
