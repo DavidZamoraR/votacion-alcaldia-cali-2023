@@ -1,10 +1,2 @@
-body {
-  font-family: Arial, sans-serif;
-  margin: 20px;
-  background: #fafafa;
-  color: #333;
-}
-
-h1 {
-  text-align: center;
-}
+body { font-family: Arial, sans-serif; margin: 20px; background: #fafafa; color: #333; }
+h1 { text-align: center; }

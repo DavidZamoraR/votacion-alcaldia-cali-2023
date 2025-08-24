@@ -1,5 +1,6 @@
 // scroller.js
 // Detecta la sección activa en el scroll y la muestra en consola
+console.log("✅ scroller.js cargado correctamente");
 
 function setupScroller() {
   const steps = d3.selectAll(".step");  // todas las secciones narrativas

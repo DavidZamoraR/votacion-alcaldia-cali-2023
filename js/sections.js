@@ -1,5 +1,6 @@
 // sections.js
 // Aquí defines qué pasa en cada sección del storytelling
+console.log("✅ sections.js cargado correctamente");
 
 function activateSection(index) {
   console.clear(); // limpiar consola para ver solo la última acción
