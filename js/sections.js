@@ -31,6 +31,18 @@ function activateSection(index) {
   }
 }
 
+function showIntro() {
+  console.log("👉 Intro (sección 0) activada");
+}
+
+function showMapaComunas() {
+  console.log("🗺️ Mapa comunas (sección 1)");
+}
+
+function showColorearComunas() {
+  console.log("🎨 Colorear comunas (sección 2)");
+}
+
 // 📌 Funciones placeholder: aquí luego meterás gráficos D3
 
 function showResultadosPorPuesto() {
