@@ -1,3 +1,6 @@
+// scroller.js
+// Configura el sistema de scroll para las visualizaciones
+
 function setupScroller() {
   const steps = d3.selectAll(".step");
   const chartContainer = d3.select("#chart-container");
@@ -6,7 +9,7 @@ function setupScroller() {
   const observerOptions = {
     root: null,
     rootMargin: "0px",
-    threshold: 0.6 // 60% visible
+    threshold: 0.6
   };
 
   // Crear observer
@@ -67,6 +70,3 @@ function setupScroller() {
   // Activar la primera sección al inicio
   activateSection(0);
 }
-
-// Inicializar scroller cuando la página cargue
-window.addEventListener("DOMContentLoaded", setupScroller);
