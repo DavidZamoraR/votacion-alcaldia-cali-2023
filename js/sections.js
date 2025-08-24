@@ -33,18 +33,6 @@ function activateSection(index) {
 
 // 📌 Funciones placeholder: aquí luego meterás gráficos D3
 
-function showIntro() {
-  console.log("📊 Intro: texto general de las elecciones en Cali");
-}
-
-function showMapaComunas() {
-  console.log("🗺️ Mostrar mapa de Cali por comunas");
-}
-
-function showColoresPorCandidato() {
-  console.log("🎨 Colorear comunas según candidato ganador");
-}
-
 function showResultadosPorPuesto() {
   d3.select("#vis").html(""); // limpiar antes de dibujar
 
@@ -52,36 +40,32 @@ function showResultadosPorPuesto() {
   const barHeight = 25;
 
   d3.csv("data/votos.csv").then(data => {
-    console.log("Ejemplo de fila:", data[0]); // debug columnas
-
-    // 🔹 Convertir a número y crear campos extra
+    // convertir a número
     data.forEach(d => {
       d.eder = +d["ALVARO ALEJANDRO EDER GARCES"];
       d.ortiz = +d["ROBERTO ORTIZ URUEÑA"];
       d.renteria = +d["DANIS ANTONIO RENTERIA CHALA"];
-
-      // resto = total - (eder + ortiz + rentería)
       d.resto = +d["TOTAL_VOTOS"] - (d.eder + d.ortiz + d.renteria);
     });
 
     // claves para la pila
     const keys = ["eder", "ortiz", "renteria", "resto"];
 
-    // colores por sección
+    // colores
     const color = d3.scaleOrdinal()
       .domain(keys)
       .range([
-        "#FFD700", // eder → amarillo
-        "#FF0000", // ortiz → rojo
-        "#800080", // renteria → lila
-        "#A9A9A9"  // resto → gris
+        "#FFD700", // Eder
+        "#FF0000", // Ortiz
+        "#800080", // Rentería
+        "#A9A9A9"  // Otros
       ]);
 
-    // pila
+    // crear pila
     const stack = d3.stack().keys(keys);
     const series = stack(data);
 
-    // escala horizontal
+    // escala horizontal proporcional a votos
     const x = d3.scaleLinear()
       .domain([0, d3.max(data, d => d["TOTAL_VOTOS"])])
       .range([0, width - 200]);
@@ -92,7 +76,7 @@ function showResultadosPorPuesto() {
       .attr("width", width)
       .attr("height", barHeight * data.length + 80);
 
-    // dibujar por capas (stacked)
+    // dibujar capas apiladas
     svg.selectAll("g.layer")
       .data(series)
       .enter()
@@ -102,9 +86,9 @@ function showResultadosPorPuesto() {
       .data(d => d)
       .enter()
       .append("rect")
-      .attr("x", d => 150 + x(d[0]))
+      .attr("x", d => 150 + x(d[0]))            // inicio acumulado
       .attr("y", (d, i) => i * barHeight)
-      .attr("width", d => x(d[1]) - x(d[0]))
+      .attr("width", d => x(d[1]) - x(d[0]))    // diferencia acumulada
       .attr("height", barHeight - 4);
 
     // etiquetas de puestos
@@ -119,7 +103,7 @@ function showResultadosPorPuesto() {
       .attr("text-anchor", "end")
       .text(d => d["nom_puesto"]);
 
-    // 🎨 Leyenda
+    // leyenda
     const legend = svg.append("g")
       .attr("transform", `translate(0, ${barHeight * data.length + 20})`);
 
@@ -146,6 +130,7 @@ function showResultadosPorPuesto() {
     });
   });
 }
+
 
 
 
