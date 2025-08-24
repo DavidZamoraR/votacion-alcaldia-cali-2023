@@ -6,3 +6,15 @@ h1 {
   text-align: center;
   color: red;
 }
+
+#vis svg {
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+}
+.label {
+  fill: #333;
+  font-weight: bold;
+}
+.value {
+  fill: #555;
+}
