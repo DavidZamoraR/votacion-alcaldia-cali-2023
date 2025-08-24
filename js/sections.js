@@ -46,29 +46,27 @@ function showColoresPorCandidato() {
 }
 
 function showResultadosPorPuesto() {
-  d3.select("#vis").html(""); // limpiar antes de dibujar
+  d3.select("#vis").html(""); 
 
-  const width = 700;
+  const width = 800;
   const barHeight = 25;
 
   d3.csv("data/votos.csv").then(data => {
-    // convertir números
+    console.log("Ejemplo de fila:", data[0]); // 👀 para debug
+
     data.forEach(d => {
-      d.TOTAL_VOTOS = +d.TOTAL_VOTOS;
+      d.TOTAL_VOTOS = +d["TOTAL_VOTOS"];   // asegurar acceso con []
     });
 
-    // escala para el ancho de barras
     const x = d3.scaleLinear()
       .domain([0, d3.max(data, d => d.TOTAL_VOTOS)])
       .range([0, width - 200]);
 
-    // crear svg
     const svg = d3.select("#vis")
       .append("svg")
       .attr("width", width)
       .attr("height", barHeight * data.length + 40);
 
-    // barras
     svg.selectAll("rect")
       .data(data)
       .enter()
@@ -79,30 +77,27 @@ function showResultadosPorPuesto() {
       .attr("height", barHeight - 4)
       .attr("fill", "steelblue");
 
-    // etiquetas de texto (puesto)
     svg.selectAll("text.label")
       .data(data)
       .enter()
       .append("text")
-      .attr("class", "label")
       .attr("x", 145)
       .attr("y", (d, i) => i * barHeight + barHeight / 2)
       .attr("dy", ".35em")
       .attr("text-anchor", "end")
-      .text(d => d.nom_puesto);
+      .text(d => d["nom_puesto"]);  // 👈 usar []
 
-    // etiquetas de texto (valores)
     svg.selectAll("text.value")
       .data(data)
       .enter()
       .append("text")
-      .attr("class", "value")
       .attr("x", d => 150 + x(d.TOTAL_VOTOS) + 5)
       .attr("y", (d, i) => i * barHeight + barHeight / 2)
       .attr("dy", ".35em")
       .text(d => d.TOTAL_VOTOS);
   });
 }
+
 
 
 
