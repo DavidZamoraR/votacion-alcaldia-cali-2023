@@ -3,17 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <title>Resultados Alcaldía Cali 2023</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- CSS -->
   <link rel="stylesheet" href="css/main.css">
+  
+  <!-- Librerías JS -->
   <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 <body>
-  <h1>Resultados Elecciones Alcaldía Cali 2023</h1>
-  <p>Visualización inspirada en el proyecto de John Guerra.</p>
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <h1>Resultados Elecciones Alcaldía Cali 2023</h1>
+      </div>
+    </div>
 
-  <!-- Secciones del scrollytelling -->
-  <div id="sections"></div>
+    <div class="row" id="graphic">
+      <!-- Aquí D3 dibujará -->
+      <div id="vis">
+        <!-- Gráficos dinámicos -->
+      </div>
 
-  <!-- Scripts principales -->
+      <!-- Secciones del storytelling -->
+      <div class="col-12" id="sections">
+        <section class="step">
+          <h2>¿Cómo votaron los caleños en la elección de Alcaldía 2023?</h2>
+          <p>Este es un análisis de la votación en las <strong>comunas</strong> y <strong>puestos de votación</strong> de Cali.</p>
+          <p>Desplázate hacia abajo para continuar.</p>
+        </section>
+
+        <section class="step">
+          <h2>Visualizando los resultados</h2>
+          <p>Comencemos con un mapa de Cali dividido por <strong>comunas</strong>.</p>
+        </section>
+
+        <section class="step">
+          <h2>Coloreando por candidato</h2>
+          <p>Cada comuna se colorea según el candidato ganador.  
+          <span class="colorCandidato1">Candidato 1</span> y  
+          <span class="colorCandidato2">Candidato 2</span>.</p>
+        </section>
+
+        <section class="step">
+          <h2>Resultados por puesto</h2>
+          <p>Si miramos a nivel de <strong>puesto de votación</strong>, encontramos un panorama más detallado.</p>
+        </section>
+
+        <section class="step">
+          <h2>Círculos por puesto</h2>
+          <p>Cada puesto se representa como un círculo, cuyo tamaño depende del número de votantes.</p>
+        </section>
+
+        <section class="step">
+          <h2>Comparaciones entre comunas</h2>
+          <p>Al reorganizar los puestos podemos comparar fácilmente los patrones de votación entre comunas.</p>
+        </section>
+
+        <section class="step last">
+          <h2>Conclusiones</h2>
+          <p>Esta visualización permite entender mejor cómo se distribuyeron los votos en Cali, tanto por comunas como por puestos de votación.</p>
+          <p>Inspirado en el trabajo de <a href="https://github.com/john-guerra">John Guerra</a>.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
   <script src="js/scroller.js"></script>
   <script src="js/sections.js"></script>
 </body>
