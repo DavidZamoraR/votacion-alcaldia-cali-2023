@@ -1,98 +1,73 @@
 // sections.js
-// Aquí defines qué pasa en cada sección del storytelling
-function activateSection(index) {
-  console.clear(); // limpiar consola para ver solo la última acción
-  console.log(`👉 Se activó la sección ${index}`);
 
-  switch (index) {
-    case 0:
-      showIntro();
-      break;
-    case 1:
-      showMapaComunas();
-      break;
-    case 2:
-      showColoresPorCandidato();
-      break;
-    case 3:
-      showResultadosPorPuesto();
-      break;
-    case 4:
-      showCirculosPorPuesto();
-      break;
-    case 5:
-      showComparacionesComunas();
-      break;
-    case 6:
-      showConclusiones();
-      break;
-    default:
-      console.log("Sección no definida");
-  }
-}
+console.log("✅ sections.js cargado");
 
-// 📌 Funciones placeholder: aquí luego meterás gráficos D3
+// --- Funciones por sección --- //
 
 function showIntro() {
-  console.log("📊 Intro: texto general de las elecciones en Cali");
+  console.log("👉 Intro (sección 0) activada");
+  d3.select("#vis").html("<p style='padding:20px'>Bienvenido al análisis de resultados.</p>");
 }
 
 function showMapaComunas() {
-  console.log("🗺️ Mostrar mapa de Cali por comunas");
+  console.log("🗺️ Mapa comunas (sección 1)");
+  d3.select("#vis").html("<p style='padding:20px'>Aquí iría un mapa de comunas (pendiente).</p>");
 }
 
-function showColoresPorCandidato() {
-  console.log("🎨 Colorear comunas según candidato ganador");
+function showColorearComunas() {
+  console.log("🎨 Colorear comunas (sección 2)");
+  d3.select("#vis").html("<p style='padding:20px'>Aquí iría la versión coloreada por candidato.</p>");
 }
 
+// --- Ya existente: resultados por puesto --- //
 function showResultadosPorPuesto() {
-  d3.select("#vis").html(""); // limpiar antes de dibujar
-
-  const width = 800;
-  const barHeight = 25;
+  console.log("📊 Mostrando resultados por puesto");
 
   d3.csv("data/votos.csv").then(data => {
-    console.log("Ejemplo de fila:", data[0]); // debug cabeceras
+    d3.select("#vis").html(""); // limpiar
 
-    // convertir a número
+    const width = 800;
+    const barHeight = 20;
+
     data.forEach(d => {
-      d.TOTAL_VOTOS = +d["TOTAL_VOTOS"];
+      d.eder = +d["ALVARO ALEJANDRO EDER GARCES"];
+      d.ortiz = +d["ROBERTO ORTIZ URUEÑA"];
+      d.renteria = +d["DANIS ANTONIO RENTERIA CHALA"];
+      d.resto = +d["TOTAL_VOTOS"] - (d.eder + d.ortiz + d.renteria);
     });
 
-    // escala horizontal (votos → ancho de barra)
+    const keys = ["eder", "ortiz", "renteria", "resto"];
+
+    const color = d3.scaleOrdinal()
+      .domain(keys)
+      .range(["#FFD700", "#FF0000", "#800080", "#A9A9A9"]);
+
+    const stack = d3.stack().keys(keys);
+    const series = stack(data);
+
     const x = d3.scaleLinear()
-      .domain([0, d3.max(data, d => d.TOTAL_VOTOS)])
+      .domain([0, d3.max(data, d => d["TOTAL_VOTOS"])])
       .range([0, width - 200]);
 
-    // 🎨 escala de colores binaria (solo dos ganadores)
-    const color = d3.scaleOrdinal()
-      .domain([
-        "ALVARO ALEJANDRO EDER GARCES",
-        "ROBERTO ORTIZ URUEÑA"
-      ])
-      .range([
-        "#FFD700", // amarillo → Eder
-        "#FF0000"  // rojo → Ortiz
-      ]);
-
-    // crear SVG
     const svg = d3.select("#vis")
       .append("svg")
       .attr("width", width)
-      .attr("height", barHeight * data.length + 60);
+      .attr("height", barHeight * data.length + 100);
 
-    // 📊 dibujar barras
-    svg.selectAll("rect")
-      .data(data)
+    svg.selectAll("g.layer")
+      .data(series)
+      .enter()
+      .append("g")
+      .attr("fill", d => color(d.key))
+      .selectAll("rect")
+      .data(d => d)
       .enter()
       .append("rect")
-      .attr("x", 150)
+      .attr("x", d => 150 + x(d[0]))
       .attr("y", (d, i) => i * barHeight)
-      .attr("width", d => x(d.TOTAL_VOTOS))
-      .attr("height", barHeight - 4)
-      .attr("fill", d => color(d["gana"]));
+      .attr("width", d => x(d[1]) - x(d[0]))
+      .attr("height", barHeight - 2);
 
-    // etiquetas de texto (nombres de puestos)
     svg.selectAll("text.label")
       .data(data)
       .enter()
@@ -103,57 +78,110 @@ function showResultadosPorPuesto() {
       .attr("dy", ".35em")
       .attr("text-anchor", "end")
       .text(d => d["nom_puesto"]);
-
-    // etiquetas de valores (total votos)
-    svg.selectAll("text.value")
-      .data(data)
-      .enter()
-      .append("text")
-      .attr("class", "value")
-      .attr("x", d => 150 + x(d.TOTAL_VOTOS) + 5)
-      .attr("y", (d, i) => i * barHeight + barHeight / 2)
-      .attr("dy", ".35em")
-      .text(d => d.TOTAL_VOTOS);
-
-    // 🎨 Leyenda simple
-    const legend = svg.append("g")
-      .attr("transform", `translate(0, ${barHeight * data.length + 20})`);
-
-    const legendData = [
-      { candidato: "ALVARO ALEJANDRO EDER GARCES", color: "#FFD700" },
-      { candidato: "ROBERTO ORTIZ URUEÑA", color: "#FF0000" }
-    ];
-
-    legendData.forEach((d, i) => {
-      const g = legend.append("g").attr("transform", `translate(${i * 250},0)`);
-
-      g.append("rect")
-        .attr("width", 14)
-        .attr("height", 14)
-        .attr("fill", d.color);
-
-      g.append("text")
-        .attr("x", 20)
-        .attr("y", 12)
-        .attr("font-size", "12px")
-        .text(d.candidato);
-    });
   });
 }
 
+// --- NUEVO: resultados agregados por comuna --- //
+function showResultadosPorComuna() {
+  console.log("📊 Mostrando votos totales por comuna (territorio)");
 
+  d3.csv("data/votos.csv").then(data => {
+    d3.select("#vis").html(""); // limpiar
 
+    const candidatos = [
+      "ALVARO ALEJANDRO EDER GARCES",
+      "ROBERTO ORTIZ URUEÑA",
+      "DANIS ANTONIO RENTERIA CHALA",
+      "DIANA CAROLINA ROJAS ATEHORTUA",
+      "EDILSON HUERFANO ORDOÑEZ",
+      "HERIBERTO ESCOBAR GONZALEZ",
+      "MIYERLANDI TORRES AGREDO",
+      "WILFREDO PARDO HERRERA",
+      "WILSON RUIZ OREJUELA",
+      "VOTOS EN BLANCO",
+      "VOTOS NO MARCADOS",
+      "VOTOS NULOS"
+    ];
 
+    // Agrupar por territorio
+    const votosPorComuna = d3.rollups(
+      data,
+      v => {
+        let totales = {};
+        candidatos.forEach(c => (totales[c] = d3.sum(v, d => +d[c])));
+        totales["TOTAL_VOTOS"] = d3.sum(v, d => +d.TOTAL_VOTOS);
 
+        // definir ganador de la comuna
+        const ganador = Object.entries(totales)
+          .filter(([k]) => candidatos.includes(k))
+          .sort((a, b) => d3.descending(a[1], b[1]))[0][0];
 
-function showCirculosPorPuesto() {
-  console.log("⚪ Círculos representando puestos (tamaño = votantes)");
+        return { ...totales, gana_comuna: ganador };
+      },
+      d => d.territorio
+    ).map(([territorio, valores]) => ({ territorio, ...valores }));
+
+    // Configuración gráfica
+    const width = 800;
+    const height = 500;
+    const margin = { top: 40, right: 20, bottom: 100, left: 80 };
+
+    const svg = d3.select("#vis")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    const x = d3.scaleBand()
+      .domain(votosPorComuna.map(d => d.territorio))
+      .range([margin.left, width - margin.right])
+      .padding(0.2);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(votosPorComuna, d => d.TOTAL_VOTOS)])
+      .nice()
+      .range([height - margin.bottom, margin.top]);
+
+    const colorGanador = d3.scaleOrdinal()
+      .domain(["ALVARO ALEJANDRO EDER GARCES", "ROBERTO ORTIZ URUEÑA"])
+      .range(["#FFD700", "#FF0000"]);
+
+    // Dibujar barras
+    svg.selectAll(".bar")
+      .data(votosPorComuna)
+      .enter()
+      .append("rect")
+      .attr("class", "bar")
+      .attr("x", d => x(d.territorio))
+      .attr("y", d => y(d.TOTAL_VOTOS))
+      .attr("width", x.bandwidth())
+      .attr("height", d => y(0) - y(d.TOTAL_VOTOS))
+      .attr("fill", d => colorGanador(d.gana_comuna) || "#A9A9A9");
+
+    // Ejes
+    svg.append("g")
+      .attr("transform", `translate(0,${height - margin.bottom})`)
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .attr("transform", "rotate(-45)")
+      .style("text-anchor", "end");
+
+    svg.append("g")
+      .attr("transform", `translate(${margin.left},0)`)
+      .call(d3.axisLeft(y));
+  });
 }
 
-function showComparacionesComunas() {
-  console.log("📊 Comparaciones entre comunas");
-}
+// --- Controlador de secciones --- //
+function activateSection(index) {
+  console.log("👉 Se activó la sección " + index);
 
-function showConclusiones() {
-  console.log("✅ Conclusiones finales");
+  switch (index) {
+    case 0: showIntro(); break;
+    case 1: showMapaComunas(); break;
+    case 2: showColorearComunas(); break;
+    case 3: showResultadosPorPuesto(); break;
+    case 4: showResultadosPorComuna(); break;
+    default:
+      console.log("Sección sin función aún");
+  }
 }
