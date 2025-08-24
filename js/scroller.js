@@ -5,11 +5,14 @@ function setupScroller() {
   const steps = d3.selectAll(".step");
   const chartContainer = d3.select("#chart-container");
 
+  // Umbral diferente para móviles
+  const threshold = isMobileDevice() ? 0.4 : 0.6;
+
   // Opciones del IntersectionObserver
   const observerOptions = {
     root: null,
     rootMargin: "0px",
-    threshold: 0.6
+    threshold: threshold
   };
 
   // Crear observer

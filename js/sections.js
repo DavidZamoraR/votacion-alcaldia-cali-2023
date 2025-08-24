@@ -62,14 +62,18 @@ function showResultadosPorPuesto() {
     return;
   }
 
-  const width = 650;
-  const height = 500;
-  const margin = { top: 40, right: 150, bottom: 100, left: 200 };
+  // Obtener dimensiones responsivas
+  const dim = getResponsiveDimensions();
+  const width = dim.width;
+  const height = dim.height;
+  const margin = dim.margin;
 
   const svg = chartContainer.append("svg")
     .attr("width", width)
     .attr("height", height)
-    .attr("class", "img-fluid");
+    .attr("class", "img-fluid")
+    .attr("viewBox", `0 0 ${width} ${height}`) // Hacer SVG responsive
+    .attr("preserveAspectRatio", "xMidYMid meet");
 
   // Agrupar por comuna
   const dataByComuna = d3.group(electionData, d => d.comuna);
@@ -125,19 +129,30 @@ function showResultadosPorPuesto() {
     .attr("rx", 3) // Bordes redondeados
     .attr("ry", 3);
 
-  // Eje Y
+  // Eje Y - Ajustar para móviles
   svg.append("g")
     .attr("transform", `translate(${margin.left},0)`)
     .call(d3.axisLeft(y))
     .selectAll("text")
-    .style("font-size", "11px");
+    .style("font-size", isMobileDevice() ? "10px" : "11px")
+    .call(wrapText, margin.left - 10); // Ajustar texto largo
 
   // Eje X
   svg.append("g")
     .attr("transform", `translate(0,${height - margin.bottom})`)
-    .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format(",")))
+    .call(d3.axisBottom(x).ticks(isMobileDevice() ? 4 : 5).tickFormat(d3.format(",")))
     .selectAll("text")
-    .style("font-size", "11px");
+    .style("font-size", isMobileDevice() ? "10px" : "11px")
+    .attr("transform", isMobileDevice() ? "rotate(-45)" : ""); // Rotar texto en móviles
+
+  // Título - más pequeño en móviles
+  svg.append("text")
+    .attr("x", width / 2)
+    .attr("y", isMobileDevice() ? 15 : 20)
+    .attr("text-anchor", "middle")
+    .style("font-size", isMobileDevice() ? "14px" : "16px")
+    .style("font-weight", "bold")
+    .text("Total de votos por comuna");
 
   // Título
   svg.append("text")
@@ -148,9 +163,13 @@ function showResultadosPorPuesto() {
     .style("font-weight", "bold")
     .text("Total de votos por comuna");
 
-  // Leyenda
+  // Leyenda - reposicionar para móviles
+  const legendX = isMobileDevice() ? width / 2 - 75 : width - margin.right + 20;
+  const legendY = isMobileDevice() ? height - 60 : margin.top;
+  
   const legend = svg.append("g")
-    .attr("transform", `translate(${width - margin.right + 20}, ${margin.top})`);
+    .attr("transform", `translate(${legendX}, ${legendY})`);
+  
 
   const candidates = [
     { name: "Eder Garcés", color: "#FFD700" },
@@ -278,4 +297,29 @@ function showConclusiones() {
       </div>
     </div>
   `);
+}
+
+function wrapText(texts, width) {
+  texts.each(function() {
+    const text = d3.select(this);
+    const words = text.text().split(/\s+/).reverse();
+    let word;
+    let line = [];
+    let lineNumber = 0;
+    const lineHeight = 1.1;
+    const y = text.attr("y");
+    const dy = parseFloat(text.attr("dy"));
+    let tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+    
+    while (word = words.pop()) {
+      line.push(word);
+      tspan.text(line.join(" "));
+      if (tspan.node().getComputedTextLength() > width) {
+        line.pop();
+        tspan.text(line.join(" "));
+        line = [word];
+        tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+      }
+    }
+  });
 }

@@ -99,3 +99,58 @@ h2 {
   pointer-events: none;
   font-size: 12px;
 }
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 1.8rem;
+    margin: 15px 0;
+  }
+  
+  #vis {
+    height: 50vh !important;
+    position: relative !important;
+    top: 0 !important;
+    margin-bottom: 20px;
+  }
+  
+  .step {
+    margin-bottom: 40vh;
+    padding: 15px;
+  }
+  
+  .step h2 {
+    font-size: 1.3rem;
+  }
+  
+  .step p {
+    font-size: 0.9rem;
+  }
+  
+  /* Asegurar que los gráficos sean responsive */
+  #chart-container svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Mejoras para tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #vis {
+    height: 70vh;
+  }
+}
+
+/* Mejorar visualización de tooltips en móviles */
+.tooltip {
+  max-width: 200px;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Asegurar que el contenedor de gráficos sea responsive */
+#chart-container {
+  width: 100%;
+  overflow: hidden;
+}
