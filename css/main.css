@@ -1,22 +1,18 @@
 body {
-  background: yellow; /* para que sea evidente */
+  background-color: #ffffff; /* blanco */
+  color: #333; /* texto gris oscuro */
   font-family: Arial, sans-serif;
-}
-h1 {
-  text-align: center;
-  color: red;
 }
 
 #vis svg {
   font-family: Arial, sans-serif;
   font-size: 11px;
 }
+
 .label {
   fill: #333;
   font-weight: bold;
 }
-.value {
-  fill: #555;
-}
+
 
 

@@ -52,47 +52,62 @@ function showResultadosPorPuesto() {
   const barHeight = 25;
 
   d3.csv("data/votos.csv").then(data => {
-    console.log("Ejemplo de fila:", data[0]); // debug cabeceras
+    console.log("Ejemplo de fila:", data[0]); // debug columnas
 
-    // convertir a número
+    // 🔹 Convertir a número y crear campos extra
     data.forEach(d => {
-      d.TOTAL_VOTOS = +d["TOTAL_VOTOS"];
+      d.eder = +d["ALVARO ALEJANDRO EDER GARCES"];
+      d.ortiz = +d["ROBERTO ORTIZ URUEÑA"];
+      d.renteria = +d["DANIS ANTONIO RENTERIA CHALA"];
+
+      // resto = total - (eder + ortiz + rentería)
+      d.resto = +d["TOTAL_VOTOS"] - (d.eder + d.ortiz + d.renteria);
     });
 
-    // escala horizontal (votos → ancho de barra)
-    const x = d3.scaleLinear()
-      .domain([0, d3.max(data, d => d.TOTAL_VOTOS)])
-      .range([0, width - 200]);
+    // claves para la pila
+    const keys = ["eder", "ortiz", "renteria", "resto"];
 
-    // 🎨 escala de colores binaria (solo dos ganadores)
+    // colores por sección
     const color = d3.scaleOrdinal()
-      .domain([
-        "ALVARO ALEJANDRO EDER GARCES",
-        "ROBERTO ORTIZ URUEÑA"
-      ])
+      .domain(keys)
       .range([
-        "#FFD700", // amarillo → Eder
-        "#FF0000"  // rojo → Ortiz
+        "#FFD700", // eder → amarillo
+        "#FF0000", // ortiz → rojo
+        "#800080", // renteria → lila
+        "#A9A9A9"  // resto → gris
       ]);
+
+    // pila
+    const stack = d3.stack().keys(keys);
+    const series = stack(data);
+
+    // escala horizontal
+    const x = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d["TOTAL_VOTOS"])])
+      .range([0, width - 200]);
 
     // crear SVG
     const svg = d3.select("#vis")
       .append("svg")
       .attr("width", width)
-      .attr("height", barHeight * data.length + 60);
+      .attr("height", barHeight * data.length + 80);
 
-    // 📊 dibujar barras
-    svg.selectAll("rect")
-      .data(data)
+    // dibujar por capas (stacked)
+    svg.selectAll("g.layer")
+      .data(series)
+      .enter()
+      .append("g")
+      .attr("fill", d => color(d.key))
+      .selectAll("rect")
+      .data(d => d)
       .enter()
       .append("rect")
-      .attr("x", 150)
+      .attr("x", d => 150 + x(d[0]))
       .attr("y", (d, i) => i * barHeight)
-      .attr("width", d => x(d.TOTAL_VOTOS))
-      .attr("height", barHeight - 4)
-      .attr("fill", d => color(d["gana"]));
+      .attr("width", d => x(d[1]) - x(d[0]))
+      .attr("height", barHeight - 4);
 
-    // etiquetas de texto (nombres de puestos)
+    // etiquetas de puestos
     svg.selectAll("text.label")
       .data(data)
       .enter()
@@ -104,28 +119,19 @@ function showResultadosPorPuesto() {
       .attr("text-anchor", "end")
       .text(d => d["nom_puesto"]);
 
-    // etiquetas de valores (total votos)
-    svg.selectAll("text.value")
-      .data(data)
-      .enter()
-      .append("text")
-      .attr("class", "value")
-      .attr("x", d => 150 + x(d.TOTAL_VOTOS) + 5)
-      .attr("y", (d, i) => i * barHeight + barHeight / 2)
-      .attr("dy", ".35em")
-      .text(d => d.TOTAL_VOTOS);
-
-    // 🎨 Leyenda simple
+    // 🎨 Leyenda
     const legend = svg.append("g")
       .attr("transform", `translate(0, ${barHeight * data.length + 20})`);
 
     const legendData = [
-      { candidato: "ALVARO ALEJANDRO EDER GARCES", color: "#FFD700" },
-      { candidato: "ROBERTO ORTIZ URUEÑA", color: "#FF0000" }
+      { key: "eder", label: "Eder", color: "#FFD700" },
+      { key: "ortiz", label: "Ortiz", color: "#FF0000" },
+      { key: "renteria", label: "Rentería", color: "#800080" },
+      { key: "resto", label: "Otros", color: "#A9A9A9" }
     ];
 
     legendData.forEach((d, i) => {
-      const g = legend.append("g").attr("transform", `translate(${i * 250},0)`);
+      const g = legend.append("g").attr("transform", `translate(${i * 120},0)`);
 
       g.append("rect")
         .attr("width", 14)
@@ -136,10 +142,11 @@ function showResultadosPorPuesto() {
         .attr("x", 20)
         .attr("y", 12)
         .attr("font-size", "12px")
-        .text(d.candidato);
+        .text(d.label);
     });
   });
 }
+
 
 
 
