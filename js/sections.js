@@ -48,20 +48,19 @@ function showColoresPorCandidato() {
 function showResultadosPorPuesto() {
   d3.select("#vis").html(""); // limpiar antes de dibujar
 
-  const width = 500;
+  const width = 700;
   const barHeight = 25;
 
-  // cargar datos del CSV
   d3.csv("data/votos.csv").then(data => {
-    // convertir números (porque d3.csv lee todo como string)
+    // convertir números
     data.forEach(d => {
-      d.total_votantes = +d.total_votantes;
+      d.TOTAL_VOTOS = +d.TOTAL_VOTOS;
     });
 
-    // escala para el ancho de las barras
+    // escala para el ancho de barras
     const x = d3.scaleLinear()
-      .domain([0, d3.max(data, d => d.total_votantes)])
-      .range([0, width - 100]);
+      .domain([0, d3.max(data, d => d.TOTAL_VOTOS)])
+      .range([0, width - 200]);
 
     // crear svg
     const svg = d3.select("#vis")
@@ -69,28 +68,28 @@ function showResultadosPorPuesto() {
       .attr("width", width)
       .attr("height", barHeight * data.length + 40);
 
-    // dibujar barras
+    // barras
     svg.selectAll("rect")
       .data(data)
       .enter()
       .append("rect")
-      .attr("x", 100)
+      .attr("x", 150)
       .attr("y", (d, i) => i * barHeight)
-      .attr("width", d => x(d.total_votantes))
+      .attr("width", d => x(d.TOTAL_VOTOS))
       .attr("height", barHeight - 4)
       .attr("fill", "steelblue");
 
-    // etiquetas de texto (puestos)
+    // etiquetas de texto (puesto)
     svg.selectAll("text.label")
       .data(data)
       .enter()
       .append("text")
       .attr("class", "label")
-      .attr("x", 95)
+      .attr("x", 145)
       .attr("y", (d, i) => i * barHeight + barHeight / 2)
       .attr("dy", ".35em")
       .attr("text-anchor", "end")
-      .text(d => `${d.comuna}-${d.puesto}`);
+      .text(d => d.nom_puesto);
 
     // etiquetas de texto (valores)
     svg.selectAll("text.value")
@@ -98,12 +97,13 @@ function showResultadosPorPuesto() {
       .enter()
       .append("text")
       .attr("class", "value")
-      .attr("x", d => 100 + x(d.total_votantes) + 5)
+      .attr("x", d => 150 + x(d.TOTAL_VOTOS) + 5)
       .attr("y", (d, i) => i * barHeight + barHeight / 2)
       .attr("dy", ".35em")
-      .text(d => d.total_votantes);
+      .text(d => d.TOTAL_VOTOS);
   });
 }
+
 
 
 

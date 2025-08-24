@@ -9,7 +9,7 @@ h1 {
 
 #vis svg {
   font-family: Arial, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
 }
 .label {
   fill: #333;
@@ -18,3 +18,4 @@ h1 {
 .value {
   fill: #555;
 }
+
