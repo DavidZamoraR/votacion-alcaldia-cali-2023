@@ -2,11 +2,17 @@
 // Configura el sistema de scroll para las visualizaciones
 
 function setupScroller() {
+  // Verificar que las funciones de visualización existan
+  if (typeof showIntro !== 'function') {
+    console.error("❌ Las funciones de visualización no están disponibles");
+    return;
+  }
+
   const steps = d3.selectAll(".step");
   const chartContainer = d3.select("#chart-container");
 
   // Umbral diferente para móviles
-  const threshold = isMobileDevice() ? 0.4 : 0.6;
+  const threshold = typeof isMobileDevice === 'function' && isMobileDevice() ? 0.4 : 0.6;
 
   // Opciones del IntersectionObserver
   const observerOptions = {
@@ -42,6 +48,26 @@ function setupScroller() {
     // Limpiar contenedor
     chartContainer.html("");
 
+    // Mostrar mensaje de carga si los datos no están listos
+    if (!electionData || electionData.length === 0) {
+      chartContainer.html(`
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando datos...</span>
+          </div>
+          <p class="mt-2">Cargando datos electorales...</p>
+        </div>
+      `);
+      
+      // Reintentar después de un breve tiempo
+      setTimeout(() => {
+        if (electionData && electionData.length > 0) {
+          activateSection(index);
+        }
+      }, 500);
+      return;
+    }
+
     // Ejecutar la visualización correspondiente
     switch (index) {
       case 0:
@@ -67,6 +93,7 @@ function setupScroller() {
         break;
       default:
         console.warn("⚠️ No hay función definida para la sección", index);
+        chartContainer.html(`<p>Visualización no disponible</p>`);
     }
   }
 

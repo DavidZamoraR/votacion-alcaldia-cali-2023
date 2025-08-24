@@ -1,6 +1,29 @@
 // sections.js
 // Contiene las funciones de visualización
 
+// Verificar que D3 esté cargado
+if (typeof d3 === 'undefined') {
+    console.error('❌ D3.js no está cargado correctamente');
+}
+
+// Verificar que las funciones de responsive estén disponibles
+if (typeof getResponsiveDimensions === 'undefined') {
+    console.warn('⚠️ Las funciones responsive no están disponibles');
+    
+    // Definir funciones de respaldo
+    function getResponsiveDimensions() {
+        return {
+            width: 600,
+            height: 400,
+            margin: { top: 40, right: 150, bottom: 100, left: 200 }
+        };
+    }
+    
+    function isMobileDevice() {
+        return window.innerWidth <= 768;
+    }
+}
+
 function showIntro() {
   const chartContainer = d3.select("#chart-container");
   

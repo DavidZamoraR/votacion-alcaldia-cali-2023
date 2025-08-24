@@ -18,7 +18,7 @@ function getResponsiveDimensions() {
     
     if (isMobileDevice()) {
         return {
-            width: containerWidth - 20, // Margen para móviles
+            width: containerWidth - 20,
             height: 400,
             margin: { top: 30, right: 20, bottom: 80, left: 100 }
         };
@@ -34,14 +34,10 @@ function getResponsiveDimensions() {
 // Función para ajustar estilos en móviles
 function adjustForMobile() {
     if (isMobileDevice()) {
-        // Ajustar fuentes para móviles
         d3.selectAll(".step h2").style("font-size", "1.3rem");
         d3.selectAll(".step p").style("font-size", "0.9rem");
-        
-        // Ajustar el contenedor de visualización
         d3.select("#vis").style("height", "50vh");
     } else {
-        // Restaurar estilos para desktop
         d3.selectAll(".step h2").style("font-size", "");
         d3.selectAll(".step p").style("font-size", "");
         d3.select("#vis").style("height", "80vh");
@@ -50,10 +46,12 @@ function adjustForMobile() {
 
 // Redibujar visualización actual cuando cambia el tamaño
 function redrawCurrentVisualization() {
-    const activeSection = d3.select(".step.active");
-    if (!activeSection.empty()) {
-        const index = Array.from(d3.selectAll(".step").nodes()).indexOf(activeSection.node());
-        activateSection(index);
+    if (typeof activateSection === 'function') {
+        const activeSection = d3.select(".step.active");
+        if (!activeSection.empty()) {
+            const index = Array.from(d3.selectAll(".step").nodes()).indexOf(activeSection.node());
+            activateSection(index);
+        }
     }
 }
 
@@ -67,7 +65,7 @@ window.addEventListener('resize', function() {
             adjustForMobile();
             redrawCurrentVisualization();
         }
-    }, 250); // Esperar 250ms después del último resize
+    }, 250);
 });
 
 // Ajustar inicialmente al cargar la página

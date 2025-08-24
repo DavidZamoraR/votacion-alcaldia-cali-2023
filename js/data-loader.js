@@ -43,5 +43,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof setupScroller === 'function') {
             setupScroller();
         }
+    }).catch(error => {
+        console.error("Error al cargar datos:", error);
+        d3.select("#chart-container").html(`
+            <div class="alert alert-danger">
+                Error al cargar los datos. Por favor, recarga la página.
+            </div>
+        `);
     });
 });
