@@ -48,8 +48,24 @@ function showColoresPorCandidato() {
 }
 
 function showResultadosPorPuesto() {
-  console.log("📍 Mostrar resultados por puesto de votación");
+  d3.select("#vis").html(""); // limpiar antes de dibujar algo nuevo
+
+  d3.csv("data/votos.csv").then(data => {
+    console.log("📊 Datos cargados:", data);
+
+    // Mostrar en pantalla los nombres de los puestos
+    const container = d3.select("#vis")
+      .append("div")
+      .attr("class", "puestos");
+
+    container.selectAll("p")
+      .data(data)
+      .enter()
+      .append("p")
+      .text(d => `Comuna ${d.comuna} - ${d.puesto}: ${d.total_votantes} votantes`);
+  });
 }
+
 
 function showCirculosPorPuesto() {
   console.log("⚪ Círculos representando puestos (tamaño = votantes)");
