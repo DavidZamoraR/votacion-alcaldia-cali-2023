@@ -1,8 +1,10 @@
 // responsive.js
 // Maneja el comportamiento responsive de las visualizaciones
 
-// Variable para almacenar el ancho actual
+// Variables globales
 let currentWidth = window.innerWidth;
+let electionData = [];
+let dataLoaded = false;
 
 // Función para verificar si es un dispositivo móvil
 function isMobileDevice() {
@@ -11,7 +13,7 @@ function isMobileDevice() {
 
 // Función para ajustar dimensiones según el dispositivo
 function getResponsiveDimensions() {
-    const container = d3.select("#chart-container").node();
+    const container = document.getElementById("chart-container");
     if (!container) return { width: 600, height: 400 };
     
     const containerWidth = container.clientWidth;
@@ -34,24 +36,64 @@ function getResponsiveDimensions() {
 // Función para ajustar estilos en móviles
 function adjustForMobile() {
     if (isMobileDevice()) {
-        d3.selectAll(".step h2").style("font-size", "1.3rem");
-        d3.selectAll(".step p").style("font-size", "0.9rem");
-        d3.select("#vis").style("height", "50vh");
+        document.querySelectorAll(".step h2").forEach(el => {
+            el.style.fontSize = "1.3rem";
+        });
+        document.querySelectorAll(".step p").forEach(el => {
+            el.style.fontSize = "0.9rem";
+        });
+        document.getElementById("vis").style.height = "50vh";
     } else {
-        d3.selectAll(".step h2").style("font-size", "");
-        d3.selectAll(".step p").style("font-size", "");
-        d3.select("#vis").style("height", "80vh");
+        document.querySelectorAll(".step h2").forEach(el => {
+            el.style.fontSize = "";
+        });
+        document.querySelectorAll(".step p").forEach(el => {
+            el.style.fontSize = "";
+        });
+        document.getElementById("vis").style.height = "80vh";
     }
+}
+
+// Cargar datos electorales
+function loadElectionData() {
+    return new Promise((resolve, reject) => {
+        if (dataLoaded) {
+            resolve(electionData);
+            return;
+        }
+
+        d3.csv("data/votos.csv")
+            .then(function(data) {
+                electionData = data.map(d => {
+                    return {
+                        id: d.id_puesto,
+                        puesto: d.nom_puesto,
+                        comuna: d.territorio,
+                        totalVotos: +d.TOTAL_VOTOS,
+                        eder: +d["ALVARO ALEJANDRO EDER GARCES"],
+                        ortiz: +d["ROBERTO ORTIZ URUEÑA"],
+                        ganador: d.gana
+                    };
+                });
+                
+                dataLoaded = true;
+                console.log("✅ Datos cargados:", electionData.length, "puestos");
+                resolve(electionData);
+            })
+            .catch(function(error) {
+                console.error("❌ Error al cargar los datos:", error);
+                reject(error);
+            });
+    });
 }
 
 // Redibujar visualización actual cuando cambia el tamaño
 function redrawCurrentVisualization() {
-    if (typeof activateSection === 'function') {
-        const activeSection = d3.select(".step.active");
-        if (!activeSection.empty()) {
-            const index = Array.from(d3.selectAll(".step").nodes()).indexOf(activeSection.node());
-            activateSection(index);
-        }
+    const activeSection = document.querySelector(".step.active");
+    if (activeSection && typeof activateSection === 'function') {
+        const steps = document.querySelectorAll(".step");
+        const index = Array.from(steps).indexOf(activeSection);
+        activateSection(index);
     }
 }
 
@@ -68,7 +110,19 @@ window.addEventListener('resize', function() {
     }, 250);
 });
 
-// Ajustar inicialmente al cargar la página
+// Inicializar cuando la página esté lista
 document.addEventListener('DOMContentLoaded', function() {
     adjustForMobile();
+    loadElectionData().then(() => {
+        if (typeof setupScroller === 'function') {
+            setupScroller();
+        }
+    }).catch(error => {
+        console.error("Error al cargar datos:", error);
+        document.getElementById("chart-container").innerHTML = `
+            <div class="alert alert-danger">
+                Error al cargar los datos. Por favor, recarga la página.
+            </div>
+        `;
+    });
 });
