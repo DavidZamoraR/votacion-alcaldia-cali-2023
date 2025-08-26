@@ -1,60 +1,63 @@
 // js/scroller_util.js
-function scroller() {
-  let container = d3.select('body');
-  let dispatch = d3.dispatch('active', 'progress');
-  let sections = [];
-  let sectionPositions = [];
+// Utilidad para scrollytelling estilo John Guerra
+function scrollerUtil() {
+  let container = d3.select("body");
+  let sections = null;
+  let dispatch = d3.dispatch("active", "progress");
+
+  let observer = null;
   let currentIndex = -1;
 
   function scroll(selection) {
-    sections = selection.nodes();
+    sections = selection;
 
-    // calcular posiciones de cada sección
-    const yOffset = window.innerHeight * 0.6; // umbral ~60% de pantalla
-    sectionPositions = sections.map(el => {
-      const rect = el.getBoundingClientRect();
-      const top = window.pageYOffset + rect.top;
-      return top - yOffset;
+    // Usamos IntersectionObserver para detectar scroll
+    const options = {
+      root: null,
+      rootMargin: "0px",
+      threshold: d3.range(0, 1.05, 0.05) // progresivo (0, 0.05, 0.1, ...1)
+    };
+
+    observer = new IntersectionObserver(handleIntersect, options);
+    sections.each(function(_, i) {
+      observer.observe(this);
+      this.__sectionIndex = i; // guardar índice en nodo
     });
-
-    d3.select(window)
-      .on('scroll.scroller', position)
-      .on('resize.scroller', resize);
-
-    // disparar al inicio
-    position();
-    return scroll;
   }
 
-  function position() {
-    const pos = window.pageYOffset;
-    let sectionIndex = d3.bisect(sectionPositions, pos) - 1;
-    sectionIndex = Math.max(0, Math.min(sections.length - 1, sectionIndex));
+  function handleIntersect(entries) {
+    entries.forEach(entry => {
+      const i = entry.target.__sectionIndex;
 
-    if (currentIndex !== sectionIndex) {
-      currentIndex = sectionIndex;
-      dispatch.call('active', this, currentIndex);
-    }
+      if (entry.intersectionRatio > 0.5) {
+        if (i !== currentIndex) {
+          currentIndex = i;
+          dispatch.call("active", null, i);
+        }
+      }
 
-    const prevIndex = Math.max(sectionIndex - 1, 0);
-    const prevTop = sectionPositions[prevIndex];
-    const prevBottom = sectionPositions[prevIndex + 1] || (document.body.scrollHeight);
-    const progress = (pos - prevTop) / (prevBottom - prevTop);
-    dispatch.call('progress', this, sectionIndex, Math.max(0, Math.min(1, progress)));
+      // progress (0 a 1)
+      if (entry.isIntersecting) {
+        dispatch.call("progress", null, i, entry.intersectionRatio);
+      }
+    });
   }
 
-  function resize() {
-    scroll(d3.selectAll('.step'));
-  }
-
-  scroll.container = function(_x) {
+  // API
+  scroll.container = function(_c) {
     if (!arguments.length) return container;
-    container = _x;
+    container = _c;
     return scroll;
   };
 
-  scroll.on = function(event, handler) {
-    dispatch.on(event, handler);
+  scroll.sections = function(_s) {
+    if (!arguments.length) return sections;
+    sections = _s;
+    return scroll;
+  };
+
+  scroll.on = function(action, callback) {
+    dispatch.on(action, callback);
     return scroll;
   };
 

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- CSS -->
-  <link rel="stylesheet" href="css/main.css?v=2.0" />
+  <link rel="stylesheet" href="css/main.css?v=3.0" />
 
   <!-- Librerías -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -19,9 +19,12 @@
     </div></div>
 
     <div class="row" id="graphic">
+      <!-- Visualización -->
       <div class="col-md-8">
         <div id="vis"><div id="chart-container"></div></div>
       </div>
+
+      <!-- Texto narrativo -->
       <div class="col-md-4" id="sections">
         <section class="step" id="step0">
           <h2>Introducción</h2>
@@ -29,7 +32,7 @@
         </section>
         <section class="step" id="step1">
           <h2>Mapa de comunas</h2>
-          <p>Mostramos las comunas de Cali (borrador).</p>
+          <p>Mostramos las comunas de Cali.</p>
         </section>
         <section class="step" id="step2">
           <h2>Choropleth por ganador</h2>
@@ -37,11 +40,11 @@
         </section>
         <section class="step" id="step3">
           <h2>Stacked bars por comuna</h2>
-          <p>Distribución de Eder / Ortiz / Rentería / Resto.</p>
+          <p>Distribución de votos por candidato y categorías.</p>
         </section>
         <section class="step" id="step4">
           <h2>Puestos (borrador)</h2>
-          <p>Puntos / círculos, más adelante con coordenadas.</p>
+          <p>Puntos / círculos (futuro: coordenadas exactas).</p>
         </section>
         <section class="step last" id="step5">
           <h2>Conclusiones</h2>
@@ -51,16 +54,21 @@
     </div>
   </div>
 
-  <!-- Módulos de gráficos -->
-  <script src="js/stackedBar.js?v=2.0"></script>
+  <!-- Módulos -->
+  <script src="js/stackedBar.js?v=3.0"></script>
+  <script src="js/engineCali.js?v=3.0"></script>
+  <script src="js/scroller_util.js?v=3.0"></script>
+  <script src="js/sections.js?v=3.0"></script>
 
-  <!-- Motor (engine) -->
-  <script src="js/engineCali.js?v=2.0"></script>
-
-  <!-- Util de scroll estilo John Guerra -->
-  <script src="js/scroller_util.js?v=2.0"></script>
-
-  <!-- Controlador de escenas -->
-  <script src="js/sections.js?v=2.0"></script>
+  <!-- Loader de datos y arranque -->
+  <script>
+    Promise.all([
+      d3.csv("data/votos.csv"),
+      d3.json("geo/cali_polygon.geojson"),
+      d3.csv("data/votos_comunas.csv")
+    ]).then(([puestos, caliGeo, comunasAgg]) => {
+      initSections(puestos, caliGeo, comunasAgg);
+    }).catch(err => console.error("Error cargando datos:", err));
+  </script>
 </body>
 </html>
