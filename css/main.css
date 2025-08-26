@@ -1,156 +1,31 @@
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f8f9fa;
-  color: #333;
-  line-height: 1.6;
+/* css/main.css */
+body{
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background:#fff;
+  color:#333;
+  line-height:1.6;
+  margin:0;
+  padding:0 12px;
 }
 
-.container {
-  max-width: 1200px;
+.container{ max-width:1200px; margin:0 auto; }
+#graphic{ position:relative; margin-top:20px; }
+
+#vis{
+  position:sticky; top:20px; height:80vh;
+  background:#fff; border-radius:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  padding:12px; margin-bottom:30px; z-index:100;
 }
 
-h1 {
-  color: #2c3e50;
-  margin: 30px 0;
-  text-align: center;
-  font-weight: 700;
-}
+#chart-container{ width:100%; height:100%; }
 
-h2 {
-  color: #2c3e50;
-  margin-bottom: 15px;
-  font-weight: 600;
-}
+#sections{ position:relative; z-index:90; }
 
-#graphic {
-  position: relative;
-  margin-top: 30px;
+.step{
+  margin-bottom:60vh; padding:20px; background:#fff; border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.06);
+  opacity:0.35; transition:opacity .3s;
 }
-
-#vis {
-  position: sticky;
-  top: 20px;
-  height: 80vh;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  padding: 20px;
-  margin-bottom: 30px;
-  z-index: 100;
-}
-
-#sections {
-  position: relative;
-  z-index: 90;
-}
-
-.step {
-  margin-bottom: 60vh;
-  padding: 25px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  opacity: 0.3;
-  transition: opacity 0.5s ease;
-}
-
-.step.active {
-  opacity: 1;
-  border-left: 5px solid #3498db;
-}
-
-.step.last {
-  margin-bottom: 30px;
-}
-
-.colorEder {
-  color: #FFD700;
-  font-weight: 600;
-}
-
-.colorOrtiz {
-  color: #FF0000;
-  font-weight: 600;
-}
-
-.legend {
-  font-size: 12px;
-}
-
-.bar {
-  transition: fill 0.3s;
-}
-
-.bar:hover {
-  opacity: 0.8;
-}
-
-.axis-label {
-  font-size: 12px;
-  fill: #555;
-}
-
-.tooltip {
-  position: absolute;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  border-radius: 4px;
-  pointer-events: none;
-  font-size: 12px;
-}
-
-/* Responsive para móviles */
-@media (max-width: 768px) {
-  h1 {
-    font-size: 1.8rem;
-    margin: 15px 0;
-  }
-  
-  #vis {
-    height: 50vh !important;
-    position: relative !important;
-    top: 0 !important;
-    margin-bottom: 20px;
-  }
-  
-  .step {
-    margin-bottom: 40vh;
-    padding: 15px;
-  }
-  
-  .step h2 {
-    font-size: 1.3rem;
-  }
-  
-  .step p {
-    font-size: 0.9rem;
-  }
-  
-  /* Asegurar que los gráficos sean responsive */
-  #chart-container svg {
-    max-width: 100%;
-    height: auto;
-  }
-}
-
-/* Mejoras para tablets */
-@media (min-width: 769px) and (max-width: 1024px) {
-  #vis {
-    height: 70vh;
-  }
-}
-
-/* Mejorar visualización de tooltips en móviles */
-.tooltip {
-  max-width: 200px;
-  font-size: 14px;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-/* Asegurar que el contenedor de gráficos sea responsive */
-#chart-container {
-  width: 100%;
-  overflow: hidden;
-}
+.step.active{ opacity:1; border-left:5px solid #3498db; }
+.step.last{ margin-bottom:30px; }
