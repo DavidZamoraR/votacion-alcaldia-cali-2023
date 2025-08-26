@@ -1,32 +1,38 @@
 // js/engineCali.js
 function scrollerCali(puestos, caliGeo, comunasAgg) {
-  // estados internos
   let width = 700, height = 520;
   let margin = { top: 20, right: 20, bottom: 20, left: 20 };
-  let container = null; // selección d3 del #vis (o chart-container)
+  let container = null;
   let svg = null;
 
   // datos
-  const dataPuestos = puestos;     // filas de data/votos.csv
-  const dataComunas = comunasAgg;  // filas de data/votos_comunas.csv (agregado)
-  const geoCali = caliGeo;         // GeoJSON: polígonos comunas
+  const dataPuestos = puestos;
+  const dataComunas = comunasAgg;
+  const geoCali = caliGeo;
 
-  // mapas de ayuda
-  // normalizar nombres de comuna (asume columna 'territorio' en comunasAgg)
-  const ganadorPorComuna = (function(){
-    const map = new Map();
-    dataComunas.forEach(d => {
-      const eder = +d["ALVARO ALEJANDRO EDER GARCES"] || 0;
-      const ortiz = +d["ROBERTO ORTIZ URUEÑA"] || 0;
-      const renteria = +d["DANIS ANTONIO RENTERIA CHALA"] || 0;
-      const resto = Math.max( (+d.TOTAL_VOTOS || 0) - (eder+ortiz+renteria), 0 );
-      const ganador = (eder>=ortiz) ? "EDER" : "ORTIZ";
-      map.set((d.territorio || d.comuna || "").toUpperCase(), { ganador, eder, ortiz, renteria, resto, total:+d.TOTAL_VOTOS||0 });
-    });
-    return map;
-  })();
+  // tooltip compartido
+  const tooltip = d3.select("body")
+    .append("div")
+    .attr("id", "tooltip")
+    .style("position", "absolute")
+    .style("background", "rgba(255,255,255,0.9)")
+    .style("padding", "6px 10px")
+    .style("border", "1px solid #ccc")
+    .style("border-radius", "6px")
+    .style("pointer-events", "none")
+    .style("font-size", "12px")
+    .style("opacity", 0);
 
-  // helpers
+  // mapear comunas → ganador
+  const ganadorPorComuna = new Map();
+  comunasAgg.forEach(d => {
+    const key = (d["Nombre Comuna"] || "").toString().trim().toUpperCase();
+    const eder = +d["%_Eder"] || 0;
+    const ortiz = +d["%_Ortiz"] || 0;
+    const ganador = eder >= ortiz ? "EDER" : "ORTIZ";
+    ganadorPorComuna.set(key, { ...d, ganador });
+  });
+
   function clear() {
     if (!container) return;
     container.selectAll('*').remove();
@@ -41,7 +47,6 @@ function scrollerCali(puestos, caliGeo, comunasAgg) {
   }
 
   function featureName(f) {
-    // intenta varios nombres de propiedad típicos
     return (f.properties?.territorio || f.properties?.COMUNA || f.properties?.NOMBRE || f.properties?.name || '').toString().toUpperCase();
   }
 
@@ -50,14 +55,11 @@ function scrollerCali(puestos, caliGeo, comunasAgg) {
     return info.ganador === 'EDER' ? '#FFD700' : '#FF0000';
   }
 
-  // Métodos públicos llamados por sections.js
   function chart(selection) {
     selection.each(function() {
-      // contenedor/base donde dibujar
       container = d3.select(this).select('#chart-container').empty()
         ? d3.select(this).append('div').attr('id','chart-container')
         : d3.select(this).select('#chart-container');
-      // arranca con nada; sections.js decidirá qué mostrar
     });
   }
 
@@ -75,8 +77,6 @@ function scrollerCali(puestos, caliGeo, comunasAgg) {
     clear();
     if (!flag) return;
     const svg = ensureSVG();
-
-    // proyección y path
     const projection = d3.geoMercator().fitSize([width - margin.left - margin.right, height - margin.top - margin.bottom], geoCali);
     const path = d3.geoPath(projection);
 
@@ -97,90 +97,105 @@ function scrollerCali(puestos, caliGeo, comunasAgg) {
       .text('Mapa de Cali (comunas)');
   }
 
-  function choroplet(flag=true) {
+  function choroplet(flag = true) {
     clear();
     if (!flag) return;
     const svg = ensureSVG();
-    const projection = d3.geoMercator().fitSize([width - margin.left - margin.right, height - margin.top - margin-bottom], geoCali);
+    const projection = d3.geoMercator()
+      .fitSize([width - margin.left - margin.right, height - margin.top - margin.bottom], caliGeo);
     const path = d3.geoPath(projection);
+
+    const features = caliGeo.features || [];
 
     svg.append('g')
       .selectAll('path')
-      .data(geoCali.features || [])
+      .data(features)
       .join('path')
       .attr('d', path)
       .attr('fill', f => {
-        const name = featureName(f);
-        const info = ganadorPorComuna.get(name);
+        const id = (f.properties.id || "").toString().trim().toUpperCase();
+        const info = ganadorPorComuna.get(id);
         return colorGanador(info);
       })
       .attr('stroke', '#fff')
       .attr('stroke-width', 0.7)
-      .append('title')
-      .text(f => {
-        const name = featureName(f);
-        const info = ganadorPorComuna.get(name);
-        if (!info) return name;
-        const pctE = info.total ? (100*info.eder/info.total).toFixed(1) : '0.0';
-        const pctO = info.total ? (100*info.ortiz/info.total).toFixed(1) : '0.0';
-        return `${name}\nGanador: ${info.ganador}\nEder: ${pctE}%\nOrtiz: ${pctO}%\nTotal: ${d3.format(',')(info.total)}`;
+      .on("mouseover", function(event, f) {
+        d3.select(this).transition().duration(200).attr("stroke-width", 2);
+        const id = (f.properties.id || "").toString().trim().toUpperCase();
+        const info = ganadorPorComuna.get(id);
+        if (info) {
+          tooltip.style("opacity", 1).html(`
+            <strong>${id}</strong><br>
+            Ganador: ${info.ganador}<br>
+            Eder: ${info["%_Eder"]}%<br>
+            Ortiz: ${info["%_Ortiz"]}%<br>
+            Renteria: ${info["%_Renteria"]}%
+          `);
+        }
+      })
+      .on("mousemove", function(event) {
+        tooltip.style("left", (event.pageX + 10) + "px")
+               .style("top", (event.pageY - 20) + "px");
+      })
+      .on("mouseout", function() {
+        d3.select(this).transition().duration(200).attr("stroke-width", 0.7);
+        tooltip.style("opacity", 0);
       });
 
-    svg.append('text')
-      .attr('x', width/2)
-      .attr('y', 24)
-      .attr('text-anchor','middle')
-      .style('font-size','16px')
-      .text('Choropleth por ganador de la comuna');
+    const legend = svg.append("g")
+      .attr("transform", `translate(${width - 150},${height - 80})`);
+    legend.append("rect").attr("x", 0).attr("y", 0).attr("width", 14).attr("height", 14).attr("fill", "#FFD700");
+    legend.append("text").attr("x", 20).attr("y", 12).text("Eder").style("font-size","12px");
+    legend.append("rect").attr("x", 0).attr("y", 20).attr("width", 14).attr("height", 14).attr("fill", "#FF0000");
+    legend.append("text").attr("x", 20).attr("y", 32).text("Ortiz").style("font-size","12px");
   }
 
   function stackedBarsByComuna() {
     clear();
     const containerDiv = d3.select('#chart-container');
 
-    // Prepara datos: una fila por comuna con columnas numéricas para las keys del stacked
     const rows = [];
-    ganadorPorComuna.forEach((v, k) => {
-      rows.push({
-        comuna: k,
-        eder: v.eder,
-        ortiz: v.ortiz,
-        renteria: v.renteria,
-        resto: v.resto,
-        totalVotos: v.total
-      });
+    comunasAgg.forEach(d => {
+      let base = {
+        comuna: d["Nombre Comuna"],
+        "%_Eder": +d["%_Eder"] || 0,
+        "%_Renteria": +d["%_Renteria"] || 0,
+        "%_Ortiz": +d["%_Ortiz"] || 0,
+        "%_Vot_Blanco": +d["%_Vot_Blanco"] || 0,
+        "%_Miyer_Torres": +d["%_Miyer_Torres"] || 0,
+        "%_Vot_NM": +d["%_Vot_NM"] || 0,
+        "%_Vot_Nulos": +d["%_Vot_Nulos"] || 0
+      };
+      base["%_otros"] = Math.max(0, 100 - (
+        base["%_Eder"] + base["%_Renteria"] + base["%_Ortiz"] +
+        base["%_Vot_Blanco"] + base["%_Miyer_Torres"] +
+        base["%_Vot_NM"] + base["%_Vot_Nulos"]
+      ));
+      rows.push(base);
     });
 
-    // ordenar por total de votos desc
-    rows.sort((a,b) => b.totalVotos - a.totalVotos);
+    const chart = stackedBarChart()
+      .keys(["%_Eder","%_Renteria","%_Ortiz","%_Vot_Blanco","%_Miyer_Torres","%_Vot_NM","%_Vot_Nulos","%_otros"])
+      .size(700, 520);
 
-    // Convertir parciales a acumulados (para que el apilado sea correcto con el eje x absoluto)
-    // El stackedBarChart que definimos ya consume valores absolutos (no proporciones).
-    const chart = stackedBarChart().size(700, 520);
-    containerDiv.call(chart, rows); // truco: nuestro chart ignora segundo arg si se usa .call
-
-    // el chart está diseñado para selection.each(data) → así que mejor:
-    // containerDiv.datum(rows).call(chart);
-    containerDiv.selectAll('*').remove(); // limpiar el div extra
     containerDiv.datum(rows).call(chart);
   }
 
-  // Placeholders (siguen la API de John para poder activarlos desde sections.js)
-  function byCities(flag){ /* en nuestro caso no aplica, lo dejamos no-op */ }
-  function showCircles(flag, scramble){ 
+  // placeholders
+  function byCities(flag){}
+  function showCircles(flag, scramble){
     clear();
     d3.select('#chart-container').append('div')
       .style('padding','20px')
-      .html(`<h4>Puestos de votación</h4><p>(Placeholder) Falta integrar coordenadas para plotear puntos.</p>`);
+      .html(`<h4>Puestos de votación</h4><p>(Placeholder: integrar coords).</p>`);
   }
-  function collision(flag){ /* no-op por ahora */ }
-  function useSize(flag){ /* no-op por ahora */ }
-  function circlesByGeo(flag){ /* no-op hasta tener coords */ }
-  function xToCenter(flag){ /* no-op */ }
-  function yToCenter(flag){ /* no-op */ }
-  function yByPopulation(flag){ /* no-op */ }
+  function collision(flag){}
+  function useSize(flag){}
+  function circlesByGeo(flag){}
+  function xToCenter(flag){}
+  function yToCenter(flag){}
+  function yByPopulation(flag){}
 
-  // API pública que sections.js invocará
   chart.drawTitle = drawTitle;
   chart.showMap = showMap;
   chart.choroplet = choroplet;
