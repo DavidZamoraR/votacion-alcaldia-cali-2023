@@ -1,96 +1,113 @@
-// scroller.js
-// Configura el sistema de scroll para las visualizaciones
+/* scroller.js
+   Enlaza el util de scrollytelling con el motor (engineCali)
+   - Requiere: scroller_util.js (createScroller), engineCali.js
+   - No carga datos ni define escenas; eso lo hace sections.js
+*/
 
-function setupScroller() {
-    const steps = d3.selectAll(".step");
-    const chartContainer = d3.select("#chart-container");
+(function () {
+  // No-op seguro
+  const noop = () => {};
 
-    // Umbral diferente para móviles
-    const threshold = isMobileDevice() ? 0.4 : 0.6;
+  // Convierte un nombre de método o función en callable seguro
+  function toFn(engine, step) {
+    if (typeof step === "function") return step;
+    if (typeof step === "string" && engine && typeof engine[step] === "function") {
+      return () => engine[step]();
+    }
+    return noop;
+  }
 
-    // Opciones del IntersectionObserver
-    const observerOptions = {
-        root: null,
-        rootMargin: "0px",
-        threshold: threshold
+  // Genera escenas por defecto si no se proveen
+  function defaultScenesFromEngine(engine) {
+    // Orden sugerido: 0 título → 1 mapa → 2 choropleth → 3 barras → 4 puestos → 5 conclusión (título)
+    const seq = ["drawTitle", "showMap", "choroplet", "stackedBarsByComuna", "showCircles", "drawTitle"];
+    return seq.map(name => toFn(engine, name));
+  }
+
+  /**
+   * Crea y conecta el scroller con callbacks a escenas.
+   * @param {Object} opts
+   *   - engine: instancia devuelta por scrollerCali()
+   *   - scenes: Array<function|engineMethodName> (índice = step data-step)
+   *   - selectors: { stepsSelector, graphicSelector, visSelector, progressSelector }
+   *   - hooks: { onEnter, onExit, onProgress } (opcionales)
+   */
+  function makeStoryScroller(opts = {}) {
+    const engine = opts.engine || null;
+    const scenesRaw = Array.isArray(opts.scenes) ? opts.scenes : defaultScenesFromEngine(engine);
+
+    const scenes = scenesRaw.map(s => toFn(engine, s));
+
+    const selectors = Object.assign({
+      stepsSelector: "#sections .step",
+      graphicSelector: "#graphic",
+      visSelector: "#vis",
+      progressSelector: "#progress .progress-bar"
+    }, opts.selectors || {});
+
+    const hooks = Object.assign({
+      onEnter: noop,
+      onExit: noop,
+      onProgress: noop
+    }, opts.hooks || {});
+
+    // Crear el observador del scroll
+    const scroller = window.createScroller(selectors).setCallbacks({
+      onStepEnter: (i, el) => {
+        // Ejecutar escena del índice i (si existe)
+        if (scenes[i]) scenes[i]();
+
+        // Hook del usuario
+        hooks.onEnter(i, el);
+
+        // Emitir evento global opcional para otras piezas (leyendas, etc.)
+        window.dispatchEvent(new CustomEvent("story:enter", { detail: { index: i, el } }));
+      },
+      onStepExit: (i, el) => {
+        hooks.onExit(i, el);
+        window.dispatchEvent(new CustomEvent("story:exit", { detail: { index: i, el } }));
+      },
+      onStepProgress: (i, p, el) => {
+        hooks.onProgress(i, p, el);
+        window.dispatchEvent(new CustomEvent("story:progress", { detail: { index: i, progress: p, el } }));
+      }
+    });
+
+    // API público
+    function start() {
+      scroller.observe();
+      return api;
+    }
+
+    function destroy() {
+      scroller.destroy();
+    }
+
+    function refresh() {
+      scroller.refresh();
+    }
+
+    // Reenvía una actualización de tamaño (útil desde responsive.js)
+    function updateSize() {
+      if (engine && typeof engine.updateSize === "function") {
+        engine.updateSize();
+      }
+      scroller.refresh();
+    }
+
+    const api = {
+      start,
+      destroy,
+      refresh,
+      updateSize,
+      getActiveIndex: scroller.getActiveIndex
     };
 
-    // Crear observer
-    const observer = new IntersectionObserver(handleIntersect, observerOptions);
+    return api;
+  }
 
-    // Observar cada sección
-    steps.nodes().forEach(step => observer.observe(step));
+  // Helpers expuestos
+  window.makeStoryScroller = makeStoryScroller;
+  window.storyScenesFromEngine = defaultScenesFromEngine;
 
-    // Manejar intersecciones
-    function handleIntersect(entries) {
-        entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            const index = Array.from(steps.nodes()).indexOf(entry.target);
-            activateSection(index);
-        }
-        });
-    }
-
-    // Activar una sección
-    function activateSection(index) {
-        console.log("👉 Se activó la sección", index);
-
-        // Actualizar clases activas
-        steps.classed("active", false);
-        d3.select(steps.nodes()[index]).classed("active", true);
-
-        // Limpiar contenedor
-        chartContainer.html("");
-
-        // Mostrar mensaje de carga si los datos no están listos
-        if (!electionData || electionData.length === 0) {
-        chartContainer.html(`
-            <div class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando datos...</span>
-            </div>
-            <p class="mt-2">Cargando datos electorales...</p>
-            </div>
-        `);
-        
-        // Reintentar después de un breve tiempo
-        setTimeout(() => {
-            if (electionData && electionData.length > 0) {
-            activateSection(index);
-            }
-        }, 500);
-        return;
-        }
-
-        // Ejecutar la visualización correspondiente
-        switch (index) {
-        case 0:
-            showIntro();
-            break;
-        case 1:
-            showMapaComunas();
-            break;
-        case 2:
-            showColoresPorCandidato();
-            break;
-        case 3:
-            showResultadosPorPuesto();
-            break;
-        case 4:
-            showCirculosPorPuesto();
-            break;
-        case 5:
-            showComparacionesComunas();
-            break;
-        case 6:
-            showConclusiones();
-            break;
-        default:
-            console.warn("⚠️ No hay función definida para la sección", index);
-            chartContainer.html(`<p>Visualización no disponible</p>`);
-        }
-    }
-
-    // Activar la primera sección al inicio
-    activateSection(0);
-}
+})();

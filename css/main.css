@@ -1,44 +1,324 @@
-/* css/main.css */
-body{
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background:#fff;
-  color:#333;
-  line-height:1.6;
-  margin:0;
-  padding:0 12px;
+/* ================================
+   Storytelling Electoral Cali 2023
+   Layout sticky + scrollytelling + D3
+   ================================ */
+
+/* ---------- Variables de diseño ---------- */
+:root {
+  --bg: #ffffff;
+  --text: #333333;
+  --muted: #6b7280;         /* gris medio */
+  --line: #e5e7eb;          /* gris claro */
+  --shadow: 0 4px 12px rgba(0,0,0,.08);
+  --shadow-soft: 0 2px 8px rgba(0,0,0,.06);
+
+  /* Colores clave por candidato */
+  --eder: #FFD700;          /* Amarillo Eder */
+  --ortiz: #FF0000;         /* Rojo Ortiz */
+
+  /* Tableau10 aproximado para otros */
+  --t0: #4e79a7; --t1: #f28e2b; --t2: #e15759; --t3: #76b7b2; --t4: #59a14f;
+  --t5: #edc948; --t6: #b07aa1; --t7: #ff9da7; --t8: #9c755f; --t9: #bab0ab;
+
+  --radius: 10px;
+  --radius-sm: 8px;
+
+  --step-inactive: 0.35;
+  --step-active: 1;
+
+  --tooltip-bg: rgba(255,255,255,.95);
+  --tooltip-border: #d1d5db;
+
+  --progress-bg: rgba(0,0,0,.08);
+  --progress-bar: #3498db;
 }
 
-.container{ max-width:1200px; margin:0 auto; }
-#graphic{ position:relative; margin-top:20px; }
+/* ---------- Reset y base ---------- */
+*,
+*::before,
+*::after { box-sizing: border-box; }
 
-#vis{
-  position:sticky; top:20px; height:80vh;
-  background:#fff; border-radius:8px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.08);
-  padding:12px; margin-bottom:30px; z-index:100;
+html, body {
+  height: 100%;
 }
 
-#chart-container{ width:100%; height:100%; }
-
-#sections{ position:relative; z-index:90; }
-
-.step{
-  margin-bottom:60vh; padding:20px; background:#fff; border-radius:8px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.06);
-  opacity:0.35; transition:opacity .3s;
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
 }
-.step.active{ opacity:1; border-left:5px solid #3498db; }
-.step.last{ margin-bottom:30px; }
 
-#tooltip {
+img, svg { display: block; max-width: 100%; }
+
+a { color: inherit; text-decoration: none; }
+a:focus-visible, button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+
+/* ---------- Estructura general ---------- */
+.page-header, .page-footer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 16px 0 16px;
+}
+
+.page-footer {
+  padding: 16px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+}
+
+.title { margin: 8px 0 0 0; }
+.subtitle { margin: 4px 0 0 0; color: var(--muted); }
+
+#graphic.graphic {
+  max-width: 1200px;
+  margin: 16px auto 0 auto;
+  padding: 0 16px 16px;
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(320px, 0.9fr);
+  gap: 16px;
+}
+
+/* ---------- Panel sticky de visualización ---------- */
+#vis.vis {
+  position: sticky;
+  top: 24px;
+  height: 85vh;
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  z-index: 10;
+  overflow: hidden;
+}
+
+#chart-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* El SVG principal para mapas ocupa todo el panel */
+#map-svg.map-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Contenedor de barras apiladas cuando esa escena esté activa */
+#bars-container.bars-container {
   position: absolute;
-  background: rgba(255,255,255,0.9);
-  padding: 6px 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  inset: 0;
+  padding: 8px;
+  display: none; /* El motor lo mostrará cuando toque */
+}
+
+/* Leyenda superpuesta */
+#legend.legend {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(4px);
+  padding: 8px 10px;
+  box-shadow: var(--shadow-soft);
+  font-size: 13px;
+  max-width: 36ch;
+  display: none; /* visible en escenas con mapa/barras */
+}
+
+.legend h4 {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.legend .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.legend .swatch {
+  width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15);
+}
+
+/* ---------- Tooltip global ---------- */
+#tooltip.tooltip {
+  position: absolute;
+  background: var(--tooltip-bg);
+  padding: 8px 10px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: 8px;
   pointer-events: none;
   font-size: 12px;
+  line-height: 1.4;
   opacity: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease;
+  box-shadow: 0 2px 10px rgba(0,0,0,.18);
+  color: var(--text);
 }
 
+#tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#tooltip.error {
+  border-color: #ef4444;
+}
+
+/* ---------- Barra de progreso (opcional) ---------- */
+#progress.progress {
+  position: absolute;
+  left: 10px; right: 10px; bottom: 8px;
+  height: 6px;
+  background: var(--progress-bg);
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#progress .progress-bar {
+  width: 0%;
+  height: 100%;
+  background: var(--progress-bar);
+  transition: width .25s ease;
+}
+
+/* ---------- Columna de narrativa ---------- */
+#sections.sections {
+  position: relative;
+  z-index: 1;
+}
+
+.step {
+  margin: 0 0 60vh 0;
+  padding: 16px 16px 16px 20px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  border-left: 5px solid transparent;
+  opacity: var(--step-inactive);
+  transition: opacity .25s ease, border-color .25s ease, transform .25s ease;
+}
+
+.step h2 {
+  margin: 0 0 6px 0;
+  font-size: 20px;
+}
+
+.step p {
+  margin: 0;
+  color: var(--text);
+}
+
+.step.active {
+  opacity: var(--step-active);
+  border-left-color: var(--progress-bar);
+  transform: translateX(0);
+}
+
+.step.last { margin-bottom: 24px; }
+
+/* ---------- Clases utilitarias para D3 ---------- */
+.axis path, .axis line {
+  stroke: #9ca3af;
+}
+.axis text {
+  fill: #374151;
+  font-size: 12px;
+}
+
+.grid line {
+  stroke: #e5e7eb;
+  stroke-opacity: 0.8;
+}
+
+.comuna {
+  /* fill: #f5f5f5; */
+  stroke: #d1d5db;
+  stroke-width: 0.8px;
+}
+
+.comuna.hovered,
+.bar:hover {
+  filter: brightness(1.05);
+  outline: 2px solid rgba(0,0,0,.08);
+}
+
+.dimmed {
+  opacity: 0.25;
+}
+
+.highlight {
+  outline: 2px solid #111827;
+  outline-offset: 1px;
+}
+
+/* Swatches de conveniencia por candidato */
+.swatch-eder { background: var(--eder); }
+.swatch-ortiz { background: var(--ortiz); }
+
+/* ---------- Estados que puede aplicar el scroller ---------- */
+#vis.is-fixed { position: sticky; top: 24px; }
+#vis.is-bottom { position: absolute; bottom: 0; }
+
+/* ---------- Contenedores de componentes ---------- */
+.stackedbars-svg, .choropleth-svg, .points-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Accesibilidad ---------- */
+.noscript {
+  margin: 8px auto;
+  max-width: 1200px;
+  background: #fff8e1;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 1024px) {
+  #graphic.graphic {
+    grid-template-columns: 1fr;
+  }
+  #vis.vis {
+    height: 70vh;
+    top: 16px;
+  }
+  .step { margin-bottom: 55vh; }
+  #legend.legend {
+    right: 8px; bottom: 8px; font-size: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  #graphic.graphic { padding: 0 12px 12px; }
+  .page-header, .page-footer { padding: 12px; }
+  #vis.vis { height: 65vh; padding: 10px; }
+  .step { padding: 14px 14px 14px 16px; margin-bottom: 50vh; }
+  #legend.legend { max-width: 28ch; }
+}
+
+/* ---------- Preferencias de movimiento ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Helpers ---------- */
+.hidden { display: none !important; }
+.center { display:flex; align-items:center; justify-content:center; }
+
+/* ---------- Paleta pronta para usar en JS (opcional) ----------
+  .fill-eder { fill: var(--eder); } .stroke-eder { stroke: var(--eder); }
+  .fill-ortiz { fill: var(--ortiz); } .stroke-ortiz { stroke: var(--ortiz); }
+--------------------------------------------------------------- */

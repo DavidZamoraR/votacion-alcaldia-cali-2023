@@ -1,128 +1,90 @@
-// responsive.js
-// Maneja el comportamiento responsive de las visualizaciones
+/* responsive.js
+   Sincroniza tamaños del panel sticky y componentes D3
+   - Observa resize de ventana y del contenedor #graphic/#vis
+   - Llama _engine.updateSize() y _story.refresh()
+   - Seguro aunque aún no existan _engine/_story
+*/
 
-// Variables globales
-let currentWidth = window.innerWidth;
-let electionData = [];
-let dataLoaded = false;
+(function () {
+  // ------------- Utils -------------
+  function debounce(fn, wait = 120) {
+    let t = null;
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), wait);
+    };
+  }
 
-// Función para verificar si es un dispositivo móvil
-function isMobileDevice() {
-    return window.innerWidth <= 768;
-}
-
-// Función para ajustar dimensiones según el dispositivo
-function getResponsiveDimensions() {
-    const container = document.getElementById("chart-container");
-    if (!container) return { width: 600, height: 400 };
-    
-    const containerWidth = container.clientWidth;
-    
-    if (isMobileDevice()) {
-        return {
-            width: containerWidth - 20,
-            height: 400,
-            margin: { top: 30, right: 20, bottom: 80, left: 100 }
-        };
-    } else {
-        return {
-            width: Math.min(650, containerWidth - 30),
-            height: 500,
-            margin: { top: 40, right: 150, bottom: 100, left: 200 }
-        };
+  function safeUpdate() {
+    const eng = window._engine;
+    const story = window._story;
+    if (eng && typeof eng.updateSize === "function") {
+      eng.updateSize();
     }
-}
-
-// Función para ajustar estilos en móviles
-function adjustForMobile() {
-    if (isMobileDevice()) {
-        document.querySelectorAll(".step h2").forEach(el => {
-            el.style.fontSize = "1.3rem";
-        });
-        document.querySelectorAll(".step p").forEach(el => {
-            el.style.fontSize = "0.9rem";
-        });
-        document.getElementById("vis").style.height = "50vh";
-    } else {
-        document.querySelectorAll(".step h2").forEach(el => {
-            el.style.fontSize = "";
-        });
-        document.querySelectorAll(".step p").forEach(el => {
-            el.style.fontSize = "";
-        });
-        document.getElementById("vis").style.height = "80vh";
+    if (story && typeof story.refresh === "function") {
+      story.refresh();
     }
-}
+  }
 
-// Cargar datos electorales
-function loadElectionData() {
-    return new Promise((resolve, reject) => {
-        if (dataLoaded) {
-            resolve(electionData);
-            return;
-        }
+  const debouncedUpdate = debounce(safeUpdate, 120);
 
-        d3.csv("data/votos.csv")
-            .then(function(data) {
-                electionData = data.map(d => {
-                    return {
-                        id: d.id_puesto,
-                        puesto: d.nom_puesto,
-                        comuna: d.territorio,
-                        totalVotos: +d.TOTAL_VOTOS,
-                        eder: +d["ALVARO ALEJANDRO EDER GARCES"],
-                        ortiz: +d["ROBERTO ORTIZ URUEÑA"],
-                        ganador: d.gana
-                    };
-                });
-                
-                dataLoaded = true;
-                console.log("✅ Datos cargados:", electionData.length, "puestos");
-                resolve(electionData);
-            })
-            .catch(function(error) {
-                console.error("❌ Error al cargar los datos:", error);
-                reject(error);
-            });
-    });
-}
+  // ------------- Observers -------------
+  let roGraphic = null;
+  let roVis = null;
 
-// Redibujar visualización actual cuando cambia el tamaño
-function redrawCurrentVisualization() {
-    const activeSection = document.querySelector(".step.active");
-    if (activeSection && typeof activateSection === 'function') {
-        const steps = document.querySelectorAll(".step");
-        const index = Array.from(steps).indexOf(activeSection);
-        activateSection(index);
+  function attachObservers() {
+    const graphic = document.querySelector("#graphic");
+    const vis = document.querySelector("#vis");
+
+    if (window.ResizeObserver) {
+      if (graphic) {
+        roGraphic = new ResizeObserver(debouncedUpdate);
+        roGraphic.observe(graphic);
+      }
+      if (vis) {
+        roVis = new ResizeObserver(debouncedUpdate);
+        roVis.observe(vis);
+      }
     }
-}
 
-// Escuchar cambios de tamaño de ventana
-let resizeTimeout;
-window.addEventListener('resize', function() {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(function() {
-        if (window.innerWidth !== currentWidth) {
-            currentWidth = window.innerWidth;
-            adjustForMobile();
-            redrawCurrentVisualization();
-        }
-    }, 250);
-});
+    // Eventos del viewport
+    window.addEventListener("resize", debouncedUpdate, { passive: true });
+    window.addEventListener("orientationchange", debouncedUpdate, { passive: true });
 
-// Inicializar cuando la página esté lista
-document.addEventListener('DOMContentLoaded', function() {
-    adjustForMobile();
-    loadElectionData().then(() => {
-        if (typeof setupScroller === 'function') {
-            setupScroller();
+    // Por si cambia el zoom/DPR (algunos navegadores disparan esta media query)
+    if (window.matchMedia) {
+      try {
+        const dprQuery = window.matchMedia(`(resolution: ${Math.round(window.devicePixelRatio || 1)}dppx)`);
+        if (dprQuery && typeof dprQuery.addEventListener === "function") {
+          dprQuery.addEventListener("change", debouncedUpdate);
         }
-    }).catch(error => {
-        console.error("Error al cargar datos:", error);
-        document.getElementById("chart-container").innerHTML = `
-            <div class="alert alert-danger">
-                Error al cargar los datos. Por favor, recarga la página.
-            </div>
-        `;
-    });
-});
+      } catch (_) { /* noop */ }
+    }
+
+    // Recalcular al entrar en cada escena (por si el layout cambia)
+    window.addEventListener("story:enter", debouncedUpdate);
+  }
+
+  function detachObservers() {
+    if (roGraphic) { roGraphic.disconnect(); roGraphic = null; }
+    if (roVis) { roVis.disconnect(); roVis = null; }
+    window.removeEventListener("resize", debouncedUpdate);
+    window.removeEventListener("orientationchange", debouncedUpdate);
+    window.removeEventListener("story:enter", debouncedUpdate);
+  }
+
+  // ------------- Auto-init -------------
+  // Si el DOM ya está listo, adjunta. Con defer, esto se ejecuta al final.
+  (function init() {
+    attachObservers();
+    // Primer ajuste por si el SVG se montó antes
+    debouncedUpdate();
+  })();
+
+  // ------------- Exponer helpers opcionales -------------
+  window._responsive = {
+    refresh: debouncedUpdate,
+    destroy: detachObservers
+  };
+
+})();
