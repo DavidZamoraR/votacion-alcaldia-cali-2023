@@ -21,9 +21,9 @@
       tFast: 350,
       tNorm: 650,
       tSlow: 900,
-      intensityDomain: [10, 35],  // % en el que queremos que empiece a verse y sature
-      intensityGamma: 0.1,        // curva ( <1 = más contraste en bajos )
-      startTint: 0.25             // cuánto del color base usamos como punto de partida (no blanco)
+      intensityDomain: [1, 3],  // % en el que queremos que empiece a verse y sature
+      intensityGamma: 0.01,        // curva ( <1 = más contraste en bajos )
+      startTint: 0.8           // cuánto del color base usamos como punto de partida (no blanco)
 
     };
 
