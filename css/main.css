@@ -1,324 +1,57 @@
-/* ================================
-   Storytelling Electoral Cali 2023
-   Layout sticky + scrollytelling + D3
-   ================================ */
-
-/* ---------- Variables de diseño ---------- */
-:root {
-  --bg: #ffffff;
-  --text: #333333;
-  --muted: #6b7280;         /* gris medio */
-  --line: #e5e7eb;          /* gris claro */
-  --shadow: 0 4px 12px rgba(0,0,0,.08);
-  --shadow-soft: 0 2px 8px rgba(0,0,0,.06);
-
-  /* Colores clave por candidato */
-  --eder: #FFD700;          /* Amarillo Eder */
-  --ortiz: #FF0000;         /* Rojo Ortiz */
-
-  /* Tableau10 aproximado para otros */
-  --t0: #4e79a7; --t1: #f28e2b; --t2: #e15759; --t3: #76b7b2; --t4: #59a14f;
-  --t5: #edc948; --t6: #b07aa1; --t7: #ff9da7; --t8: #9c755f; --t9: #bab0ab;
-
-  --radius: 10px;
-  --radius-sm: 8px;
-
-  --step-inactive: 0.35;
-  --step-active: 1;
-
-  --tooltip-bg: rgba(255,255,255,.95);
-  --tooltip-border: #d1d5db;
-
-  --progress-bg: rgba(0,0,0,.08);
-  --progress-bar: #3498db;
+:root{
+  --fg:#1b1b1b;
+  --bg:#ffffff;
+  --muted:#6b7280;
+  --accent:#111827;
+  --step-w: min(540px, 42vw);
+  --vis-w: min(960px, 56vw);
 }
 
-/* ---------- Reset y base ---------- */
-*,
-*::before,
-*::after { box-sizing: border-box; }
-
-html, body {
-  height: 100%;
-}
-
-body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+*{ box-sizing: border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  color: var(--fg);
   background: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
-  margin: 0;
+  line-height: 1.35;
 }
 
-img, svg { display: block; max-width: 100%; }
+.site-header, .site-footer{
+  max-width: 1200px; margin: 0 auto; padding: 16px 20px;
+}
+.site-header h1{ margin: 8px 0 4px; font-size: clamp(22px, 2.6vw, 34px); }
+.subtitle{ color: var(--muted); margin: 0; }
 
-a { color: inherit; text-decoration: none; }
-a:focus-visible, button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
-
-/* ---------- Estructura general ---------- */
-.page-header, .page-footer {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px 16px 0 16px;
+.container{
+  max-width: 1200px; margin: 0 auto; display: grid; gap: 12px;
+  grid-template-columns: minmax(280px, var(--vis-w)) minmax(260px, var(--step-w));
+  padding: 8px 20px 40px;
 }
 
-.page-footer {
-  padding: 16px;
-  color: var(--muted);
-  border-top: 1px solid var(--line);
-  margin-top: 24px;
+#graphic{
+  position: sticky; top: 12px; align-self: start;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px;
+  height: calc(100vh - 24px);
+  min-height: 540px; display: grid; place-items: center; padding: 8px;
 }
+#vis{ width: 100%; height: 100%; }
 
-.title { margin: 8px 0 0 0; }
-.subtitle { margin: 4px 0 0 0; color: var(--muted); }
-
-#graphic.graphic {
-  max-width: 1200px;
-  margin: 16px auto 0 auto;
-  padding: 0 16px 16px;
-  display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(320px, 0.9fr);
-  gap: 16px;
-}
-
-/* ---------- Panel sticky de visualización ---------- */
-#vis.vis {
-  position: sticky;
-  top: 24px;
-  height: 85vh;
-  background: var(--bg);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 12px;
-  z-index: 10;
-  overflow: hidden;
-}
-
-#chart-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-/* El SVG principal para mapas ocupa todo el panel */
-#map-svg.map-svg {
-  width: 100%;
-  height: 100%;
-}
-
-/* Contenedor de barras apiladas cuando esa escena esté activa */
-#bars-container.bars-container {
-  position: absolute;
-  inset: 0;
-  padding: 8px;
-  display: none; /* El motor lo mostrará cuando toque */
-}
-
-/* Leyenda superpuesta */
-#legend.legend {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  background: rgba(255,255,255,.9);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  backdrop-filter: blur(4px);
-  padding: 8px 10px;
-  box-shadow: var(--shadow-soft);
-  font-size: 13px;
-  max-width: 36ch;
-  display: none; /* visible en escenas con mapa/barras */
-}
-
-.legend h4 {
-  margin: 0 0 6px 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.legend .row {
+#sections{ padding: 4px 8px; }
+.step{
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 16px 16px; margin: 12px 0;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+  min-height: 70vh;             /* <-- clave para generar scroll */
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0;
+  flex-direction: column;
+  justify-content: center;
+  margin: 4vh 0;
 }
+.step h2{ margin: 6px 0 8px; font-size: 18px; }
+.step p{ margin: 0; color: var(--accent); }
+.step.is-active{ outline: 2px solid #1118270f; }
 
-.legend .swatch {
-  width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15);
-}
+.site-footer{ color: var(--muted); }
+code{ background: #f3f4f6; padding: 0 4px; border-radius: 4px; }
 
-/* ---------- Tooltip global ---------- */
-#tooltip.tooltip {
-  position: absolute;
-  background: var(--tooltip-bg);
-  padding: 8px 10px;
-  border: 1px solid var(--tooltip-border);
-  border-radius: 8px;
-  pointer-events: none;
-  font-size: 12px;
-  line-height: 1.4;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity .15s ease, transform .15s ease;
-  box-shadow: 0 2px 10px rgba(0,0,0,.18);
-  color: var(--text);
-}
-
-#tooltip.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-#tooltip.error {
-  border-color: #ef4444;
-}
-
-/* ---------- Barra de progreso (opcional) ---------- */
-#progress.progress {
-  position: absolute;
-  left: 10px; right: 10px; bottom: 8px;
-  height: 6px;
-  background: var(--progress-bg);
-  border-radius: 999px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-#progress .progress-bar {
-  width: 0%;
-  height: 100%;
-  background: var(--progress-bar);
-  transition: width .25s ease;
-}
-
-/* ---------- Columna de narrativa ---------- */
-#sections.sections {
-  position: relative;
-  z-index: 1;
-}
-
-.step {
-  margin: 0 0 60vh 0;
-  padding: 16px 16px 16px 20px;
-  background: var(--bg);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-soft);
-  border-left: 5px solid transparent;
-  opacity: var(--step-inactive);
-  transition: opacity .25s ease, border-color .25s ease, transform .25s ease;
-}
-
-.step h2 {
-  margin: 0 0 6px 0;
-  font-size: 20px;
-}
-
-.step p {
-  margin: 0;
-  color: var(--text);
-}
-
-.step.active {
-  opacity: var(--step-active);
-  border-left-color: var(--progress-bar);
-  transform: translateX(0);
-}
-
-.step.last { margin-bottom: 24px; }
-
-/* ---------- Clases utilitarias para D3 ---------- */
-.axis path, .axis line {
-  stroke: #9ca3af;
-}
-.axis text {
-  fill: #374151;
-  font-size: 12px;
-}
-
-.grid line {
-  stroke: #e5e7eb;
-  stroke-opacity: 0.8;
-}
-
-.comuna {
-  /* fill: #f5f5f5; */
-  stroke: #d1d5db;
-  stroke-width: 0.8px;
-}
-
-.comuna.hovered,
-.bar:hover {
-  filter: brightness(1.05);
-  outline: 2px solid rgba(0,0,0,.08);
-}
-
-.dimmed {
-  opacity: 0.25;
-}
-
-.highlight {
-  outline: 2px solid #111827;
-  outline-offset: 1px;
-}
-
-/* Swatches de conveniencia por candidato */
-.swatch-eder { background: var(--eder); }
-.swatch-ortiz { background: var(--ortiz); }
-
-/* ---------- Estados que puede aplicar el scroller ---------- */
-#vis.is-fixed { position: sticky; top: 24px; }
-#vis.is-bottom { position: absolute; bottom: 0; }
-
-/* ---------- Contenedores de componentes ---------- */
-.stackedbars-svg, .choropleth-svg, .points-svg {
-  width: 100%;
-  height: 100%;
-}
-
-/* ---------- Accesibilidad ---------- */
-.noscript {
-  margin: 8px auto;
-  max-width: 1200px;
-  background: #fff8e1;
-  color: #92400e;
-  border: 1px solid #fde68a;
-  border-radius: var(--radius);
-  padding: 12px 16px;
-}
-
-/* ---------- Responsivo ---------- */
-@media (max-width: 1024px) {
-  #graphic.graphic {
-    grid-template-columns: 1fr;
-  }
-  #vis.vis {
-    height: 70vh;
-    top: 16px;
-  }
-  .step { margin-bottom: 55vh; }
-  #legend.legend {
-    right: 8px; bottom: 8px; font-size: 12px;
-  }
-}
-
-@media (max-width: 640px) {
-  #graphic.graphic { padding: 0 12px 12px; }
-  .page-header, .page-footer { padding: 12px; }
-  #vis.vis { height: 65vh; padding: 10px; }
-  .step { padding: 14px 14px 14px 16px; margin-bottom: 50vh; }
-  #legend.legend { max-width: 28ch; }
-}
-
-/* ---------- Preferencias de movimiento ---------- */
-@media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
-}
-
-/* ---------- Helpers ---------- */
-.hidden { display: none !important; }
-.center { display:flex; align-items:center; justify-content:center; }
-
-/* ---------- Paleta pronta para usar en JS (opcional) ----------
-  .fill-eder { fill: var(--eder); } .stroke-eder { stroke: var(--eder); }
-  .fill-ortiz { fill: var(--ortiz); } .stroke-ortiz { stroke: var(--ortiz); }
---------------------------------------------------------------- */
+svg{ width: 100%; height: 100%; display: block; }

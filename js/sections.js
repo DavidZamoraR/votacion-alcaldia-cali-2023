@@ -1,143 +1,58 @@
-/* sections.js
-   Conecta datos → motor (engineCali) → scroller
-   Escenas 0–5: 0 Título → 1 Mapa → 2 Choropleth → 3 Barras → 4 Puestos → 5 Conclusión
-*/
+// sections.js — Paso 3: añade estados de burbujas y reordenamientos
+import {
+  init, toOutline, toChoropleth,
+  showPoints, hidePoints,
+  toBubbles, hideBubbles,
+  reorderByMargin, reorderByTotal, clusterByWinner
+} from "./engineCali.js";
 
-(function () {
-  // ------------------- Utils -------------------
-  const norm = (s) => String(s ?? "").trim();
+const steps = [
+  // 0) Choropleth por ganador
+  () => { hidePoints(); hideBubbles(); toChoropleth(); },
 
-  // Normaliza texto para join: quita tildes, pasa a MAYÚSCULAS y colapsa espacios
-  function normalizeName(s) {
-    return norm(s)
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // sin diacríticos
-      .toUpperCase()
-      .replace(/\s+/g, " ");
-  }
+  // 1) Solo contornos
+  () => { hidePoints(false); hideBubbles(); toOutline(); },
 
-  function debounce(fn, wait = 150) {
-    let t = null;
-    return function (...args) {
-      clearTimeout(t);
-      t = setTimeout(() => fn.apply(this, args), wait);
-    };
-  }
+  // 2) Contornos + puntos (puestos)
+  () => { toOutline(); hideBubbles(); showPoints(); },
 
-  // Asegura numéricos en %_* y calcula %_otros si faltara (ya vienes 0–100)
-  function ensureOtrosAndNumbers(rows) {
-    if (!rows || !rows.length) return rows || [];
-    const sample = rows[0];
-    const pctCols = Object.keys(sample).filter(k => /^%_/.test(k));
-    const hasOtros = pctCols.includes("%_otros");
-    const coreCols = pctCols.filter(k => k !== "%_otros");
+  // 3) Burbujas: tamaño = total votos
+  () => { hidePoints(); toBubbles(); },
 
-    return rows.map(d => {
-      const x = { ...d };
-      if ("Nombre Comuna" in x) x["Nombre Comuna"] = normalizeName(x["Nombre Comuna"]);
-      Object.keys(x).forEach(k => { if (/^%_/.test(k)) x[k] = +x[k] || 0; });
-      if (!hasOtros) {
-        const sum = coreCols.reduce((acc, k) => acc + (+x[k] || 0), 0);
-        x["%_otros"] = Math.max(0, Math.min(100, 100 - sum));
+  // 4) Reordenar por margen
+  () => { reorderByMargin(); },
+
+  // 5) Reordenar por total
+  () => { reorderByTotal(); },
+
+  // 6) Agrupar por ganador
+  () => { clusterByWinner(); },
+
+  // 7) (Opcional) volver al mapa coloreado
+  () => { hidePoints(); hideBubbles(); toChoropleth(); }
+];
+
+function setupSections(){
+  const els = Array.from(document.querySelectorAll(".step"));
+  const setActive = (i) => {
+    els.forEach((el, j) => el.classList.toggle("is-active", i===j));
+    const fn = steps[i];
+    if (typeof fn === "function") fn();
+  };
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting && e.intersectionRatio >= 0.6){
+        const idx = els.indexOf(e.target);
+        if (idx > -1) setActive(idx);
       }
-      return x;
     });
-  }
+  }, { threshold: [0.6] });
 
-  function warnJoinIssues(geo, comunasAgg) {
-    try {
-      const csvSet = new Set(comunasAgg.map(d => normalizeName(d["Nombre Comuna"])));
-      const missingInCSV = [];
-      (geo.features || []).forEach(f => {
-        const id = normalizeName(f.properties.id);
-        if (!csvSet.has(id)) missingInCSV.push(f.properties.id);
-      });
-      if (missingInCSV.length) {
-        console.warn("[sections] Comunas en GeoJSON sin fila en CSV:", missingInCSV);
-      }
-    } catch { /* noop */ }
-  }
+  els.forEach(el => io.observe(el));
+}
 
-  // (Opcional) Escenas via helper — no es obligatorio usarlo
-  function makeScenes(engine) {
-    return [
-      () => engine.drawTitle(),
-      () => engine.showMap(),
-      () => engine.choroplet(),           // alias soportado por el motor
-      () => engine.stackedBarsByComuna(),
-      () => engine.showCircles(),
-      () => engine.drawTitle()
-    ];
-  }
-
-  // Atajos J/K o flechas
-  function enableKeyboardNav() {
-    const steps = Array.from(document.querySelectorAll("#sections .step"));
-    function goto(i) { if (i >= 0 && i < steps.length) steps[i].scrollIntoView({ behavior: "smooth", block: "center" }); }
-    function handler(e) {
-      const active = document.querySelector("#sections .step.active");
-      const idx = steps.indexOf(active);
-      if (e.key === "ArrowDown" || e.key.toLowerCase() === "j") goto(Math.min(steps.length - 1, (idx >= 0 ? idx + 1 : 0)));
-      else if (e.key === "ArrowUp" || e.key.toLowerCase() === "k") goto(Math.max(0, (idx >= 0 ? idx - 1 : 0)));
-    }
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }
-
-  // ------------------- Punto de entrada público -------------------
-  function initSections(puestos, caliGeo, comunasAggRaw) {
-    // 1) CSV: normalizar nombres/porcentajes y quitar fila 'NACIONAL' (no tiene polígono)
-    let comunas = ensureOtrosAndNumbers(comunasAggRaw)
-      .filter(d => d["Nombre Comuna"] !== "NACIONAL");
-
-    // 2) GeoJSON: normalizar 'id' para que matchee con CSV
-    (caliGeo.features || []).forEach(f => {
-      f.properties.id = normalizeName(f.properties.id);
-    });
-
-    // 3) Aliases puntuales (por si algún nombre alterno aparece en el futuro)
-    const aliasMap = new Map([
-      ["AREA EXPANSION", "AREA DE EXPANSION"]  // ajusta según tu CSV si llegara a cambiar
-    ]);
-    comunas = comunas.map(d => {
-      const k = d["Nombre Comuna"];
-      const k2 = aliasMap.get(k) || k;
-      return { ...d, "Nombre Comuna": k2 };
-    });
-
-    // (Debug opcional)
-    warnJoinIssues(caliGeo, comunas);
-
-    // 4) Motor con llaves de join correctas
-    const engine = window.scrollerCali({
-      comunaKey: "Nombre Comuna", // CSV
-      geoIdKey: "id"              // GeoJSON
-    });
-
-    // 5) Inicializar motor con datos ya normalizados
-    engine.init(puestos, caliGeo, comunas);
-
-    // 6) Escenas + scroller
-    const scenes = makeScenes(engine);
-    const story = window.makeStoryScroller({ engine, scenes }).start();
-
-    // 7) Responsivo mínimo (complementa responsive.js)
-    const onResize = debounce(() => {
-      if (story && typeof story.updateSize === "function") story.updateSize();
-    }, 150);
-    window.addEventListener("resize", onResize);
-
-    // 8) Atajos de teclado
-    const undoKeys = enableKeyboardNav();
-
-    // 9) Exponer
-    window._story = story;
-    window._engine = engine;
-    window._cleanupSections = () => {
-      window.removeEventListener("resize", onResize);
-      undoKeys();
-      story.destroy();
-    };
-  }
-
-  window.initSections = initSections;
-})();
+document.addEventListener("DOMContentLoaded", async () => {
+  await init();
+  setupSections();
+});

@@ -1,480 +1,322 @@
-/* engineCali.js
-   Motor modular para storytelling electoral Cali 2023
-   - Mapa base y choropleth por ganador (intensidad = margen Eder–Ortiz)
-   - Barras apiladas por comuna (via stackedBar.js)
-   - Puntos de puestos (cuando haya lat/lon)
-   Requiere D3 v7
-*/
-(function () {
-  // Exponer fábrica en window
-  window.scrollerCali = function scrollerCali(opts = {}) {
-    // ---------- Config ----------
-    const cfg = {
-      svgSelector: opts.svgSelector || "#map-svg",
-      barsSelector: opts.barsSelector || "#bars-container",
-      legendSelector: opts.legendSelector || "#legend",
-      tooltipSelector: opts.tooltipSelector || "#tooltip",
-      comunaKey: opts.comunaKey || "Nombre Comuna", // CSV
-      geoIdKey: opts.geoIdKey || "id",              // GeoJSON
-      colorEder: "#FFD700", // Amarillo
-      colorOrtiz: "#FF0000", // Rojo
-      othersPalette: d3.schemeTableau10,
-      tFast: 300,
-      tNorm: 600,
-      tSlow: 900,
-      // Intensidad basada en margen Eder–Ortiz (curva sqrt + tinte inicial)
-      marginGamma: 0.5,  // <1 para levantar contraste en bajos
-      startTint: 0.25    // 0..1: inicio ya teñido (no blanco)
-    };
+// engineCali.js — Paso 3: choropleth ↔ contornos ↔ puntos ↔ burbujas con fuerzas
+// - JOIN: "Nombre Comuna" (CSV) ↔ properties.id (GeoJSON)  [ajusta si tu GEO usa otra propiedad]
+// - Puntos (puestos.geojson) con radio más grande por defecto
+// - Burbujas: 1 círculo por comuna, radio ∝ total votos, color por ganador, opacidad ∝ margen
+// - Fuerzas: collide + reordenamientos (por margen, por total, por ganador)
 
-    // ---------- Estado ----------
-    const state = {
-      root: d3.select(cfg.svgSelector),
-      bars: d3.select(cfg.barsSelector),
-      legend: d3.select(cfg.legendSelector),
-      tooltip: d3.select(cfg.tooltipSelector),
-      width: 0,
-      height: 0,
-      projection: null,
-      path: null,
-      geo: null,
-      puestos: null,
-      comunas: null,
-      comunasByName: new Map(),
-      keysPct: [],
-      candidateColors: new Map(),
-      joinedFeatures: [],
-      layers: {},
-      marginMax: 0 // máximo |%_Eder - %_Ortiz| para escalar intensidad
-    };
+const width = 900, height = 640;
+const svg = d3.select("#vis").append("svg").attr("viewBox", [0,0,width,height]);
 
-    // ---------- Utils ----------
-    function sizeFromContainer() {
-      const node = state.root.node();
-      if (!node) return { w: 800, h: 600 };
-      const b = node.getBoundingClientRect();
-      return { w: Math.max(320, b.width | 0), h: Math.max(280, b.height | 0) };
+const gMap  = svg.append("g").attr("class", "map");
+const gPts  = svg.append("g").attr("class", "points").style("pointer-events","none");
+const gBubs = svg.append("g").attr("class", "bubbles").style("display","none");
+const gUI   = svg.append("g").attr("class", "ui");
+
+const PATHS = {
+  geo:     "geo/cali_polygon.geojson",
+  csv:     "data/votos_comunas.csv",
+  puestos: "geo/puestos.geojson"
+};
+
+// Candidatos (cabeceras del CSV)
+const CANDS = [
+  "ALVARO ALEJANDRO EDER GARCES",
+  "DANIS ANTONIO RENTERIA CHALA",
+  "DENINSON MENDOZA RAMOS",
+  "DIANA CAROLINA ROJAS ATEHORTUA",
+  "EDILSON HUERFANO ORDOÑEZ",
+  "HERIBERTO ESCOBAR GONZALEZ",
+  "MIYERLANDI TORRES AGREDO",
+  "ROBERTO ORTIZ URUEÑA",
+  "WILFREDO PARDO HERRERA",
+  "WILSON RUIZ OREJUELA"
+];
+
+const normalize = s => (s||"")
+  .toString()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .toUpperCase()
+  .replace(/[\.\-]/g," ")
+  .replace(/\s+/g," ")
+  .trim();
+
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+const partyColor = d3.scaleOrdinal().domain(CANDS).range(d3.schemeCategory10);
+const opacityByMargin = m => clamp(0.35 + m*0.9, 0.35, 1);
+
+// Puntos (puestos) más grandes por defecto
+const PTS_R_DEFAULT = 3.4;
+
+let projection, path, geo, csvMap;
+let puntosLoaded = false, puntosCache = [];
+let nodes = [], rScale, simulation;
+
+// ====== INIT ======
+export async function init(){
+  const [geojson, rows] = await Promise.all([
+    d3.json(PATHS.geo),
+    d3.csv(PATHS.csv)
+  ]);
+  geo = geojson;
+
+  // Indexar CSV
+  csvMap = new Map(rows.map(r => [normalize(r["Nombre Comuna"]), r]));
+
+  // Enlazar métricas al GEO
+  geo.features.forEach(f => {
+    const key = normalize(f.properties.id); // <- ajusta si tu GEO usa otra propiedad
+    const row = csvMap.get(key);
+    f.properties._row = row || null;
+
+    if (row){
+      const candPairs = CANDS.map(c => [c, +row[c] || 0]).sort((a,b) => d3.descending(a[1], b[1]));
+      const top1 = candPairs[0] || [null,0];
+      const top2 = candPairs[1] || [null,0];
+
+      const blancos = +row["VOTOS EN BLANCO"]    || 0;
+      const nulos   = +row["VOTOS NULOS"]        || 0;
+      const nomarc  = +row["VOTOS NO MARCADOS"]  || 0;
+      const total   = d3.sum(candPairs, d=>d[1]) + blancos + nulos + nomarc;
+
+      const winner  = row.gana || top1[0];
+      const margin  = total ? (top1[1]-top2[1]) / total : 0;
+
+      f.properties.metrics = { total, winner, margin };
     }
+  });
 
-    function fmtPct(v) { return (v == null || isNaN(v)) ? "–" : `${d3.format(".1f")(v)}%`; }
+  // Proyección y path
+  projection = d3.geoMercator().fitSize([width, height], geo);
+  path = d3.geoPath(projection);
 
-    function showTooltip(html, [x, y]) {
-      state.tooltip.html(html)
-        .style("left", `${x + 12}px`)
-        .style("top", `${y + 12}px`)
-        .classed("visible", true)
-        .attr("aria-hidden", "false");
-    }
-    function hideTooltip() { state.tooltip.classed("visible", false).attr("aria-hidden", "true"); }
+  drawChoropleth();
+  drawLegend();
+  buildBubbles(); // prepara nodos/círculos (se mostrarán cuando se pida)
+}
 
-    function sanitizeCandidateKey(k) { return String(k || "").replace(/^%_/, "").replace(/_/g, " ").trim(); }
+// ====== CHOROPLETH ======
+function drawChoropleth(){
+  const feat = gMap.selectAll("path").data(geo.features, d => d.properties.id);
 
-    function computeCandidateColors(keys) {
-      const out = new Map();
-      keys.forEach((k, i) => {
-        const name = sanitizeCandidateKey(k);
-        if (/^Eder/i.test(name)) out.set(name, cfg.colorEder);
-        else if (/^Ortiz/i.test(name)) out.set(name, cfg.colorOrtiz);
-        else out.set(name, cfg.othersPalette[i % cfg.othersPalette.length]);
-      });
-      return out;
-    }
+  const enter = feat.enter().append("path")
+    .attr("d", path)
+    .attr("stroke", "#999")
+    .attr("fill", d => {
+      const m = d.properties.metrics;
+      return m ? partyColor(m.winner) : "#eee";
+    })
+    .attr("fill-opacity", d => {
+      const m = d.properties.metrics;
+      return m ? opacityByMargin(m.margin) : 1;
+    });
 
-    function winnerForRow(row) {
-      let bestKey = null, bestVal = -Infinity, secondKey = null, secondVal = -Infinity;
-      state.keysPct.forEach(k => {
-        const v = +row[k] || 0;
-        if (v > bestVal) { secondVal = bestVal; secondKey = bestKey; bestVal = v; bestKey = k; }
-        else if (v > secondVal) { secondVal = v; secondKey = k; }
-      });
-      return {
-        winnerKey: bestKey,
-        winner: bestKey ? sanitizeCandidateKey(bestKey) : null,
-        winnerPct: bestVal,
-        second: secondKey ? sanitizeCandidateKey(secondKey) : null,
-        secondPct: secondVal,
-        margin: bestVal - secondVal
-      };
-    }
+  enter.append("title").text(titleText);
+  feat.exit().remove();
+}
 
-    function fitProjection() {
-      state.projection = d3.geoMercator();
-      state.path = d3.geoPath().projection(state.projection);
-      if (state.geo) state.projection.fitSize([state.width, state.height], state.geo);
-    }
+function titleText(d){
+  const m = d.properties.metrics || {};
+  const pct = (m.margin*100||0).toFixed(1)+"%";
+  return `${d.properties.id}
+Ganador: ${m.winner||"NA"}
+Margen: ${pct}
+Total votos: ${m.total||0}`;
+}
 
-    // ----- Intensidad por margen Eder–Ortiz (al estilo John) -----
-    function intensityFromMargin(m) {
-      if (!(state.marginMax > 0)) return 0;
-      const r = Math.max(0, Math.min(1, m / state.marginMax));
-      // curva tipo gamma (sqrt por defecto) para dar más contraste en bajos
-      return Math.pow(r, cfg.marginGamma);
-    }
-    function colorFromWinnerAndMargin(winnerName, margin) {
-      const base = state.candidateColors.get(winnerName) || "#bbb";
-      const start = d3.interpolateLab("#ffffff", base)(cfg.startTint);
-      const t = intensityFromMargin(margin);
-      return d3.interpolateLab(start, base)(t);
-    }
+// ====== MAPA A CONTORNOS ======
+export function toOutline(){
+  gMap.selectAll("path")
+    .transition().duration(500)
+    .attr("fill", "none")
+    .attr("fill-opacity", 1)
+    .attr("stroke", "#aaa");
+}
 
-    // ---------- Leyendas ----------
-    function showLegendChoropleth() {
-      const names = Array.from(new Set(
-        (state.joinedFeatures || []).map(f => f.properties.__winner?.winner).filter(Boolean)
-      ));
+// ====== VOLVER A CHOROPLETH ======
+export function toChoropleth(){
+  gMap.selectAll("path")
+    .transition().duration(500)
+    .attr("fill", d => {
+      const m = d.properties.metrics;
+      return m ? partyColor(m.winner) : "#eee";
+    })
+    .attr("fill-opacity", d => {
+      const m = d.properties.metrics;
+      return m ? opacityByMargin(m.margin) : 1;
+    })
+    .attr("stroke", "#999");
+  hidePoints(); // si había puntos visibles, ocultarlos
+  hideBubbles(); // si había burbujas visibles, ocultarlas
+}
 
-      state.legend.style("display", "block").html("");
-      state.legend.append("h4").text("Ganador por comuna");
+// ====== OVERLAY DE PUNTOS (PUESTOS) ======
+async function ensurePuntos(){
+  if (puntosLoaded) return;
+  const gj = await d3.json(PATHS.puestos);
+  puntosCache = gj.features.flatMap(f => {
+    if (!f.geometry) return [];
+    const g = f.geometry;
+    if (g.type === "Point")      return [ projection(g.coordinates) ];
+    if (g.type === "MultiPoint") return g.coordinates.map(c => projection(c));
+    return [];
+  }).filter(Boolean);
+  puntosLoaded = true;
+}
 
-      names.forEach(name => {
-        const row = state.legend.append("div").attr("class", "row");
-        row.append("span").attr("class", "swatch").style("background", state.candidateColors.get(name) || "#999");
-        row.append("span").text(name);
-      });
+export async function showPoints(){
+  await ensurePuntos();
+  const sel = gPts.selectAll("circle").data(puntosCache);
 
-      const grad = state.legend.append("div").attr("class", "row").style("margin-top", "6px");
-      grad.append("span").style("font-size", "12px").style("color", "#555").text("Menor margen");
-      grad.append("div")
-        .style("flex", "1").style("height", "10px").style("margin", "0 8px")
-        .style("background", `linear-gradient(90deg, #fff 0%, #ddd 100%)`)
-        .style("border", "1px solid #e5e7eb").style("border-radius", "6px");
-      grad.append("span").style("font-size", "12px").style("color", "#555").text("Mayor margen");
-    }
+  sel.enter().append("circle")
+    .attr("r", 0)
+    .attr("cx", d => d[0])
+    .attr("cy", d => d[1])
+    .attr("fill", "#111827")
+    .attr("fill-opacity", 0.85)
+    .attr("stroke", "#fff")
+    .attr("stroke-width", 0.6)
+    .transition().duration(350)
+    .attr("r", PTS_R_DEFAULT);
 
-    function showLegendBars(keys) {
-      state.legend.style("display", "block").html("");
-      state.legend.append("h4").text("Distribución por comuna");
-      keys.forEach(k => {
-        const name = sanitizeCandidateKey(k);
-        const row = state.legend.append("div").attr("class", "row");
-        row.append("span").attr("class", "swatch").style("background", state.candidateColors.get(name) || "#999");
-        row.append("span").text(name);
-      });
-    }
-    function hideLegend() { state.legend.style("display", "none").html(""); }
+  sel.transition().duration(250).attr("opacity", 1);
+}
 
-    // ---------- Join de datos ----------
-    function prepareData(puestos, geo, comunasAgg) {
-      state.puestos = puestos || [];
-      state.geo = geo;
-      state.comunas = comunasAgg || [];
+export function hidePoints(hard=true){
+  const t = gPts.selectAll("circle").transition().duration(250).attr("opacity", 0);
+  if (hard) t.on("end", function(){ d3.select(this).remove(); });
+}
 
-      // detectar columnas %_
-      const sample = state.comunas[0] || {};
-      state.keysPct = Object.keys(sample)
-        .filter(k => /^%_/.test(k))
-        .sort((a, b) => (a === "%_otros") - (b === "%_otros") || a.localeCompare(b));
+// ====== BURBUJAS (NODOS POR COMUNA + FUERZAS) ======
+function buildBubbles(){
+  const feats = geo.features.filter(f => f.properties?.metrics);
+  const cent  = d => path.centroid(d); // centroid en pixeles (proyección aplicada)
 
-      // colores por candidato
-      state.candidateColors = computeCandidateColors(state.keysPct);
-
-      // map comunas by name
-      state.comunasByName = new Map(state.comunas.map(d => [String(d[cfg.comunaKey]).trim(), d]));
-
-      // join + margen Eder–Ortiz
-      state.marginMax = 0;
-      state.joinedFeatures = (state.geo.features || []).map(f => {
-        const id = String(f.properties[cfg.geoIdKey]).trim();
-        const row = state.comunasByName.get(id);
-
-        if (row) {
-          const w = winnerForRow(row);
-          f.properties.__data = row;
-          f.properties.__winner = w;
-
-          const eder  = +row["%_Eder"]  || 0;
-          const ortiz = +row["%_Ortiz"] || 0;
-          const m = Math.abs(eder - ortiz);
-          f.properties.__marginEO = m;
-          if (m > state.marginMax) state.marginMax = m;
-        } else {
-          f.properties.__data = null;
-          f.properties.__winner = null;
-          f.properties.__marginEO = 0;
-        }
-        return f;
-      });
-    }
-
-    // ---------- Layers ----------
-    function ensureLayers() {
-      if (state.layers.root) return;
-      const svg = state.root;
-      svg.selectAll("*").remove();
-      state.layers.root = svg.append("g").attr("class", "root");
-      state.layers.map = state.layers.root.append("g").attr("class", "layer-map");
-      state.layers.points = state.layers.root.append("g").attr("class", "layer-points");
-      state.layers.labels = state.layers.root.append("g").attr("class", "layer-labels");
-    }
-
-    // ---------- Render base ----------
-    function renderBaseMap() {
-      ensureLayers();
-      fitProjection();
-
-      state.layers.map
-        .selectAll("path.comuna")
-        .data(state.joinedFeatures || [], d => d.properties[cfg.geoIdKey])
-        .join(
-          enter => enter.append("path")
-            .attr("class", "comuna")
-            .attr("d", state.path)
-            .style("fill", "#f5f5f5") // inicial
-            .attr("opacity", 0)
-            .on("mousemove", function (event, d) {
-              const name = d.properties[cfg.geoIdKey];
-              showTooltip(`<strong>${name}</strong>`, d3.pointer(event, document.body));
-              d3.select(this).classed("hovered", true);
-            })
-            .on("mouseout", function () { hideTooltip(); d3.select(this).classed("hovered", false); })
-            .call(sel => sel.transition().duration(cfg.tNorm).attr("opacity", 1)),
-          update => update.call(sel => sel.transition().duration(cfg.tNorm).attr("d", state.path)),
-          exit => exit.call(sel => sel.transition().duration(cfg.tFast).attr("opacity", 0).remove())
-        );
-    }
-
-    // ---------- Choropleth (por margen EO) ----------
-    function renderChoropleth() {
-      ensureLayers();
-      fitProjection();
-
-      const areasSel = state.layers.map
-        .selectAll("path.comuna")
-        .data(state.joinedFeatures || [], d => d.properties[cfg.geoIdKey])
-        .join(
-          enter => enter.append("path")
-            .attr("class", "comuna")
-            .attr("d", state.path)
-            .style("fill", "#f5f5f5")
-            .attr("opacity", 0)
-            .on("mousemove", onMoveChoro)
-            .on("mouseout", onOutChoro)
-            .call(sel => sel.transition().duration(cfg.tNorm).attr("opacity", 1)),
-          update => update
-            .on("mousemove", onMoveChoro)
-            .on("mouseout", onOutChoro)
-            .call(sel => sel.transition().duration(cfg.tNorm).attr("d", state.path)),
-          exit => exit.call(sel => sel.transition().duration(cfg.tFast).attr("opacity", 0).remove())
-        );
-
-      areasSel.transition().duration(cfg.tSlow)
-        .style("fill", d => {
-          const w = d.properties.__winner;
-          const m = d.properties.__marginEO || 0;
-          if (!w || !w.winner) return "#f0f0f0";
-          return colorFromWinnerAndMargin(w.winner, m);
-        });
-
-      function onMoveChoro(event, d) {
-        const id = d.properties[cfg.geoIdKey];
-        const w = d.properties.__winner || {};
-        const row = d.properties.__data || {};
-        const eder  = +row["%_Eder"]  || 0;
-        const ortiz = +row["%_Ortiz"] || 0;
-        const marginEO = Math.abs(eder - ortiz);
-
-        const html = `
-          <div><strong>${id}</strong></div>
-          <div>Ganador: <strong>${w.winner || "s/i"}</strong> (${fmtPct(w.winnerPct)})</div>
-          <div>Segundo: ${w.second || "s/i"} (${fmtPct(w.secondPct)})</div>
-          <div>Margen ganador–segundo: ${fmtPct(w.margin)}</div>
-          <div>Margen Eder–Ortiz: <strong>${fmtPct(marginEO)}</strong></div>
-        `;
-        showTooltip(html, d3.pointer(event, document.body));
-        d3.select(this).classed("hovered", true);
-      }
-      function onOutChoro() { hideTooltip(); d3.select(this).classed("hovered", false); }
-    }
-
-    // ---------- Barras apiladas ----------
-    function renderStackedBars() {
-      state.bars.style("display", "block");
-      state.root.style("pointer-events", "none");
-
-      if (typeof window.stackedBarChart === "function") {
-        const data = state.comunas.slice();
-        const keys = state.keysPct.slice();
-        showLegendBars(keys);
-
-        const width = state.width - 16;
-        const height = state.height - 16;
-
-        const colorScale = d3.scaleOrdinal()
-          .domain(keys.map(sanitizeCandidateKey))
-          .range(keys.map(k => state.candidateColors.get(sanitizeCandidateKey(k))));
-
-        state.bars.selectAll("*").remove();
-
-        const chart = window.stackedBarChart()
-          .width(width).height(height)
-          .keys(keys).xKey(cfg.comunaKey)
-          .valueFormat(v => `${d3.format(".1f")(v)}%`)
-          .colors(colorScale)
-          .onHover((d) => {
-            const html = `
-              <div><strong>${d.data[cfg.comunaKey]}</strong></div>
-              <div>${sanitizeCandidateKey(d.key)}: <strong>${fmtPct(d.value)}</strong></div>
-            `;
-            showTooltip(html, [d.x, d.y]);
-          })
-          .onLeave(() => hideTooltip());
-
-        // IMPORTANTE: pasar data al componente
-        state.bars.call(chart, data);
-      } else {
-        state.bars
-          .style("display", "block")
-          .style("color", "#555")
-          .html("<em>Componente de barras apiladas no disponible (stackedBar.js).</em>");
-        showLegendBars(state.keysPct);
-      }
-    }
-
-    // ---------- Puntos (puestos) ----------
-    function renderCircles() {
-      ensureLayers();
-      fitProjection();
-
-      const sample = state.puestos[0] || {};
-      const latKey = ["lat", "latitude", "LAT", "Latitud", "latitud"].find(k => k in sample) || null;
-      const lonKey = ["lon", "lng", "long", "longitude", "LON", "Longitud", "longitud"].find(k => k in sample) || null;
-
-      state.layers.points.selectAll("circle.point").remove();
-      if (!latKey || !lonKey) { console.warn("No se encontraron columnas lat/lon en votos.csv"); return; }
-
-      const pts = state.layers.points
-        .selectAll("circle.point")
-        .data(state.puestos, (d, i) => i);
-
-      pts.enter()
-        .append("circle")
-        .attr("class", "point")
-        .attr("r", 0)
-        .attr("fill", "rgba(0,0,0,0.35)")
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 0.8)
-        .attr("transform", d => {
-          const p = state.projection([+d[lonKey], +d[latKey]]);
-          return p ? `translate(${p[0]},${p[1]})` : null;
-        })
-        .on("mousemove", function (event, d) {
-          const html = `<div><strong>Puesto</strong></div>
-                        <div>${latKey}: ${(+d[latKey]).toFixed(5)}, ${lonKey}: ${(+d[lonKey]).toFixed(5)}</div>`;
-          showTooltip(html, d3.pointer(event, document.body));
-          d3.select(this).classed("hovered", true);
-        })
-        .on("mouseout", function () { hideTooltip(); d3.select(this).classed("hovered", false); })
-        .transition().duration(cfg.tNorm).attr("r", 2.8);
-
-      pts.transition().duration(cfg.tNorm)
-        .attr("transform", d => {
-          const p = state.projection([+d[lonKey], +d[latKey]]);
-          return p ? `translate(${p[0]},${p[1]})` : null;
-        });
-
-      pts.exit().transition().duration(cfg.tFast).attr("r", 0).remove();
-    }
-
-    // ---------- Escenas públicas ----------
-    function drawTitle() {
-      hideLegend(); hideTooltip();
-      renderBaseMap();
-      state.bars.style("display", "none").selectAll("*").remove();
-      state.root.style("pointer-events", "auto");
-      d3.select("#legend").style("display", "none");
-    }
-    function showMap() {
-      hideLegend(); hideTooltip();
-      renderBaseMap();
-      state.bars.style("display", "none").selectAll("*").remove();
-      state.root.style("pointer-events", "auto");
-    }
-    function choroplethScene() {
-      state.bars.style("display", "none").selectAll("*").remove();
-      state.root.style("pointer-events", "auto");
-      renderChoropleth();
-      showLegendChoropleth();
-    }
-    function stackedBarsScene() { renderStackedBars(); }
-    function circlesScene() {
-      hideLegend();
-      state.bars.style("display", "none").selectAll("*").remove();
-      state.root.style("pointer-events", "auto");
-      renderBaseMap(); renderCircles();
-    }
-    const choropletScene = choroplethScene; // alias
-
-    // ---------- Resize ----------
-    function updateSize() {
-      const { w, h } = sizeFromContainer();
-      state.width = w; state.height = h;
-      state.root.attr("viewBox", `0 0 ${w} ${h}`);
-      fitProjection();
-
-      // Redibuja paths del mapa
-      state.layers.map?.selectAll("path.comuna").attr("d", state.path);
-
-      // Reposiciona puntos
-      state.layers.points?.selectAll("circle.point")
-        .attr("transform", d => {
-          const latKey = ["lat", "latitude", "LAT", "Latitud", "latitud"].find(k => k in d) || null;
-          const lonKey = ["lon", "lng", "long", "longitude", "LON", "Longitud", "longitud"].find(k => k in d) || null;
-          if (!latKey || !lonKey) return null;
-          const p = state.projection([+d[lonKey], +d[latKey]]);
-          return p ? `translate(${p[0]},${p[1]})` : null;
-        });
-
-      // Si hay barras montadas, re-render
-      const hasBars = !state.bars.selectAll("*").empty();
-      if (hasBars && typeof window.stackedBarChart === "function") {
-        const keys = state.keysPct.slice();
-        const data = state.comunas.slice();
-        const width = state.width - 16;
-        const height = state.height - 16;
-
-        const colorScale = d3.scaleOrdinal()
-          .domain(keys.map(sanitizeCandidateKey))
-          .range(keys.map(k => state.candidateColors.get(sanitizeCandidateKey(k))));
-
-        state.bars.selectAll("*").remove();
-
-        const chart = window.stackedBarChart()
-          .width(width).height(height)
-          .keys(keys).xKey(cfg.comunaKey)
-          .valueFormat(v => `${d3.format(".1f")(v)}%`)
-          .colors(colorScale)
-          .onHover(d => showTooltip(
-            `<div><strong>${d.data[cfg.comunaKey]}</strong></div>
-             <div>${sanitizeCandidateKey(d.key)}: <strong>${fmtPct(d.value)}</strong></div>`,
-            [d.x, d.y]
-          ))
-          .onLeave(hideTooltip);
-
-        state.bars.call(chart, data);
-      }
-    }
-
-    // ---------- Init ----------
-    function init(puestos, geo, comunasAgg) {
-      const { w, h } = sizeFromContainer();
-      state.width = w; state.height = h;
-      state.root.attr("viewBox", `0 0 ${w} ${h}`);
-      prepareData(puestos, geo, comunasAgg);
-      renderBaseMap();
-    }
-
-    // ---------- API ----------
+  nodes = feats.map(f => {
+    const m = f.properties.metrics;
+    const [cx, cy] = cent(f);
     return {
-      init,
-      updateSize,
-      drawTitle,
-      showMap,
-      choropleth: choroplethScene,
-      choroplet: choropletScene, // alias
-      stackedBarsByComuna: stackedBarsScene,
-      showCircles: circlesScene,
-      _state: state,
-      _cfg: cfg
+      id: f.properties.id,
+      winner: m.winner,
+      total: m.total,
+      margin: m.margin,
+      x: cx, y: cy
     };
-  };
-})();
+  });
+
+  rScale = d3.scaleSqrt()
+    .domain([0, d3.max(nodes, d => d.total)||1])
+    .range([6, 42]); // radio mínimo/máximo de las burbujas
+
+  // Dibuja círculos (inicialmente ocultos)
+  const sel = gBubs.selectAll("circle").data(nodes, d => d.id);
+  sel.enter().append("circle")
+    .attr("r", d => rScale(d.total))
+    .attr("cx", d => d.x)
+    .attr("cy", d => d.y)
+    .attr("fill", d => partyColor(d.winner))
+    .attr("fill-opacity", d => opacityByMargin(d.margin))
+    .attr("stroke", "#333")
+    .attr("stroke-width", 0.6)
+    .append("title")
+    .text(d => `${d.id}\nGanador: ${d.winner}\nMargen: ${(d.margin*100).toFixed(1)}%\nTotal votos: ${d.total}`);
+
+  // Simulación, parada por defecto (se activa cuando se pidan burbujas)
+  simulation = d3.forceSimulation(nodes)
+    .force("collide", d3.forceCollide(d => rScale(d.total) + 1.5))
+    .force("x", d3.forceX(width/2).strength(0.05))
+    .force("y", d3.forceY(height/2).strength(0.05))
+    .alpha(0) // quieta por ahora
+    .on("tick", () => {
+      gBubs.selectAll("circle")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+    })
+    .stop();
+}
+
+export function toBubbles(){
+  // atenuar mapa a contornos y ocultar puntos
+  toOutline();
+  hidePoints(false);
+
+  gBubs.style("display", null);
+  simulation.alpha(0.9).restart();
+}
+
+export function hideBubbles(){
+  gBubs.style("display", "none");
+  if (simulation) simulation.alphaTarget(0).stop();
+}
+
+// Reordenamientos narrativos
+export function reorderByMargin(){
+  if (!nodes?.length) return;
+  const minM = d3.min(nodes, d => d.margin) || 0;
+  const maxM = d3.max(nodes, d => d.margin) || 1e-6;
+  const x = d3.scaleLinear().domain([minM, maxM]).range([80, width-80]);
+  simulation
+    .force("x", d3.forceX(d => x(d.margin)).strength(0.2))
+    .force("y", d3.forceY(height/2).strength(0.03))
+    .alpha(0.8).restart();
+}
+
+export function reorderByTotal(){
+  if (!nodes?.length) return;
+  const maxT = d3.max(nodes, d => d.total) || 1;
+  const y = d3.scaleSqrt().domain([0, maxT]).range([height-60, 80]);
+  simulation
+    .force("y", d3.forceY(d => y(d.total)).strength(0.25))
+    .force("x", d3.forceX(width/2).strength(0.05))
+    .alpha(0.8).restart();
+}
+
+export function clusterByWinner(){
+  if (!nodes?.length) return;
+  const winners = Array.from(new Set(nodes.map(d => d.winner)));
+  const x = d3.scaleBand().domain(winners).range([80, width-80]).padding(0.25);
+  const centers = new Map(winners.map(w => [w, x(w) + x.bandwidth()/2]));
+  simulation
+    .force("x", d3.forceX(d => centers.get(d.winner) || width/2).strength(0.25))
+    .force("y", d3.forceY(height/2).strength(0.05))
+    .alpha(0.8).restart();
+}
+
+// ====== LEYENDA ======
+function drawLegend(){
+  const size = 12, pad = 6;
+  const wrap = gUI.append("g").attr("transform", `translate(14,14)`);
+
+  wrap.append("text")
+    .attr("x", 0).attr("y", 0).attr("dy", "-0.4em")
+    .attr("font-size", 12).attr("fill", "#374151")
+    .text("Ganador por comuna");
+
+  const item = wrap.selectAll("g.lg").data(CANDS).enter().append("g")
+    .attr("class", "lg")
+    .attr("transform", (_,i) => `translate(0, ${i*(size+pad)+6})`);
+
+  item.append("rect")
+    .attr("width", size).attr("height", size)
+    .attr("fill", d => partyColor(d))
+    .attr("stroke", "#333").attr("stroke-width", 0.3);
+
+  item.append("text")
+    .attr("x", size + 6).attr("y", size/2)
+    .attr("dominant-baseline", "middle")
+    .attr("font-size", 12)
+    .text(d => d);
+
+  // Muestra de puntos
+  const pointsLegend = wrap.append("g")
+    .attr("transform", `translate(0, ${(CANDS.length*(size+pad))+20})`);
+  pointsLegend.append("circle")
+    .attr("r", 3.6).attr("cx", size/2).attr("cy", size/2)
+    .attr("fill", "#111827").attr("fill-opacity", 0.85)
+    .attr("stroke", "#fff").attr("stroke-width", 0.6);
+  pointsLegend.append("text")
+    .attr("x", size + 6).attr("y", size/2)
+    .attr("dominant-baseline", "middle")
+    .attr("font-size", 12)
+    .text("Puestos electorales");
+}

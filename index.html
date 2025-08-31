@@ -2,125 +2,79 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Resultados Alcaldía Cali 2023</title>
+  <title>Resultados Alcaldía Cali 2023 — Scrollytelling</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Storytelling interactivo de los resultados de la elección de Alcaldía de Cali 2023: mapa, choropleth, barras apiladas y puestos de votación con D3.js." />
 
   <!-- CSS -->
-  <link rel="stylesheet" href="css/main.css?v=4.0" />
+  <link rel="stylesheet" href="css/main.css" />
 
-  <!-- Librerías (defer para no bloquear el parseo) -->
-  <script defer src="https://d3js.org/d3.v7.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <!-- D3 v5 (coherente con el flujo del proyecto original) -->
+  <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 <body>
-  <noscript>
-    <div class="noscript">
-      Esta visualización requiere JavaScript habilitado.
-    </div>
-  </noscript>
-
-  <header class="page-header">
-    <h1 class="title">Resultados Elecciones Alcaldía Cali 2023</h1>
-    <p class="subtitle">Desplázate para avanzar en la historia</p>
+  <header class="site-header">
+    <h1>Resultados Alcaldía Cali 2023</h1>
+    <p class="subtitle">Explora el mapa: ganador por comuna y margen de victoria</p>
   </header>
 
-  <main id="graphic" class="graphic" aria-live="polite">
-    <!-- Vis panel (pegajoso) -->
-    <section id="vis" class="vis" aria-label="Visualización principal">
-      <div id="chart-container" class="chart-container">
-        <!-- Placeholders que el motor poblará según la escena -->
-        <svg id="map-svg" class="map-svg" aria-label="Mapa de comunas"></svg>
-        <div id="legend" class="legend" aria-label="Leyenda"></div>
-        <div id="bars-container" class="bars-container"></div>
-      </div>
+  <main class="container">
+    <!-- Visualización fija (sticky) -->
+    <div id="graphic">
+      <div id="vis" aria-label="Visualización principal"></div>
+    </div>
 
-      <!-- Tooltip global reutilizable -->
-      <div id="tooltip" class="tooltip" role="tooltip" aria-hidden="true"></div>
-
-      <!-- Indicador de progreso (opcional, se puede estilizar en CSS) -->
-      <div id="progress" class="progress" aria-hidden="true">
-        <div class="progress-bar"></div>
-      </div>
-    </section>
-
-    <!-- Texto narrativo (pasos del scrollytelling) -->
-    <aside id="sections" class="sections" aria-label="Narrativa por pasos">
-      <section class="step" id="step0" data-step="0">
-        <h2>Introducción</h2>
-        <p>Explora cómo votó Cali en 2023. Desplázate para avanzar.</p>
+    <!-- Relato por secciones -->
+    <div id="sections" aria-label="Secciones del relato">
+      <section class="step is-active">
+        <h2>Mapa por ganador</h2>
+        <p>Color por candidato ganador en cada comuna. Opacidad ~ margen de victoria.</p>
       </section>
 
-      <section class="step" id="step1" data-step="1">
-        <h2>Mapa de comunas</h2>
-        <p>Mostramos las comunas de Cali con sus límites oficiales.</p>
+      <section class="step">
+        <h2>Sólo contornos</h2>
+        <p>Quitamos relleno: dejamos los límites listos para superponer puntos.</p>
       </section>
 
-      <section class="step" id="step2" data-step="2">
-        <h2>Choropleth por ganador</h2>
-        <p>Coloreamos por ganador de la comuna (Eder = amarillo, Ortiz = rojo) y mostramos la intensidad por porcentaje.</p>
+      <section class="step">
+        <h2>(Próximo) Burbujas y comparaciones</h2>
+        <p>En el siguiente paso activaremos nodos por comuna y fuerzas para evitar solapes.</p>
       </section>
 
-      <section class="step" id="step3" data-step="3">
-        <h2>Barras apiladas por comuna</h2>
-        <p>Distribución de votos por candidato y categorías (incluye %_otros).</p>
+      <!-- Añade estas secciones debajo de las tres que ya tienes -->
+      <section class="step">
+        <h2>Burbujas por comuna</h2>
+        <p>Cada comuna se convierte en una burbuja; el tamaño representa el total de votos, el color indica el ganador y la opacidad el margen.</p>
       </section>
 
-      <section class="step" id="step4" data-step="4">
-        <h2>Puestos de votación</h2>
-        <p>Círculos georreferenciados (borrador) con información contextual.</p>
+      <section class="step">
+        <h2>Márgenes de victoria</h2>
+        <p>Reordenamos las burbujas en el eje X por el margen de victoria: de ajustado a contundente.</p>
       </section>
 
-      <section class="step last" id="step5" data-step="5">
-        <h2>Conclusiones</h2>
-        <p>Resumen de resultados y comparaciones clave.</p>
+      <section class="step">
+        <h2>Peso por total de votos</h2>
+        <p>Ahora las organizamos en el eje Y por el total de votos: permite identificar las comunas con mayor peso electoral.</p>
       </section>
-    </aside>
+
+      <section class="step">
+        <h2>¿Quién ganó más comunas?</h2>
+        <p>Agrupamos en columnas por candidato ganador para ver, de un vistazo, la distribución de victorias.</p>
+      </section>
+
+      <!-- (Opcional) cierre que vuelve al mapa -->
+      <section class="step">
+        <h2>Volver al mapa</h2>
+        <p>Regresamos al choropleth para recapitular el panorama geográfico.</p>
+      </section>
+
+    </div>
   </main>
 
-  <footer class="page-footer">
-    <small>Fuente: Registraduría Nacional (procesamiento propio). Hecho con D3.js.</small>
+  <footer class="site-footer">
+    <small>Fuente: Registraduría / cálculos propios. Datos: <code>votos_comunas.csv</code>, <code>cali_polygon.geojson</code>.</small>
   </footer>
 
-  <!-- Módulos (orden: componentes → motor → utilidades/scroll → escenas → responsive) -->
-  <script defer src="js/stackedBar.js?v=4.0"></script>
-  <script defer src="js/engineCali.js?v=4.0"></script>
-  <script defer src="js/scroller_util.js?v=4.0"></script>
-  <script defer src="js/scroller.js?v=4.0"></script>
-  <script defer src="js/sections.js?v=4.0"></script>
-  <script defer src="js/responsive.js?v=4.0"></script>
-
-  <!-- Loader de datos y arranque -->
-  <script>
-  window.addEventListener("DOMContentLoaded", function () {
-    const DATA = {
-      votosPuestos: "data/votos.csv",
-      votosComunas: "data/votos_comunas.csv",
-      geoComunas: "geo/cali_polygon.geojson"
-    };
-
-    Promise.all([
-      d3.csv(DATA.votosPuestos, d3.autoType),
-      d3.json(DATA.geoComunas),
-      d3.csv(DATA.votosComunas, d3.autoType)
-    ])
-    .then(([puestos, caliGeo, comunasAgg]) => {
-      if (typeof initSections === "function") {
-        initSections(puestos, caliGeo, comunasAgg);
-      } else {
-        console.error("initSections no está definido. ¿Cargaste sections.js?");
-      }
-    })
-    .catch(err => {
-      console.error("Error cargando datos:", err);
-      const tooltip = document.getElementById("tooltip");
-      if (tooltip) {
-        tooltip.textContent = "Error cargando datos. Revisa rutas y formato.";
-        tooltip.classList.add("visible", "error");
-        tooltip.setAttribute("aria-hidden", "false");
-      }
-    });
-  });
-</script>
+  <!-- App (módulos ES) -->
+  <script type="module" src="js/sections.js"></script>
 </body>
 </html>
