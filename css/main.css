@@ -8,11 +8,13 @@
 }
 
 *{ box-sizing: border-box; }
+
 html,body{ margin:0; padding:0; }
+
 body{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji";
   color: var(--fg);
-  background: var(--bg);
+  background: #fde5c4;
   line-height: 1.35;
 }
 
@@ -35,6 +37,8 @@ body{
   min-height: 540px; display: grid; place-items: center; padding: 8px;
 }
 #vis{ width: 100%; height: 100%; }
+
+#vTooltip { background: #fde5c4aa; }  
 
 #sections{ padding: 4px 8px; }
 .step{
