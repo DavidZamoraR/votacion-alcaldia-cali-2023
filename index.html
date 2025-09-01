@@ -8,78 +8,78 @@
   <!-- CSS -->
   <link rel="stylesheet" href="css/main.css" />
 
-  <!-- D3 v5 (coherente con el flujo del proyecto original) -->
+  <!-- D3 (v5) -->
   <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 <body>
   <header class="site-header">
     <h1>Resultados Alcaldía Cali 2023</h1>
-    <p class="subtitle">Explora el mapa: ganador por comuna y margen de victoria</p>
+    <p class="subtitle">Un recorrido visual por comunas y puestos de votación.</p>
   </header>
 
   <main class="container">
-    <!-- Visualización fija (sticky) -->
+    <!-- Visualización sticky -->
     <div id="graphic">
       <div id="vis" aria-label="Visualización principal"></div>
     </div>
 
-    <!-- Relato por secciones -->
+    <!-- Relato / pasos -->
     <div id="sections" aria-label="Secciones del relato">
+      <!-- STEP 0 -->
       <section class="step is-active">
-        <h2>Mapa por ganador</h2>
-        <p>Color por candidato ganador en cada comuna. Opacidad ~ margen de victoria.</p>
+        <h2>¿Cómo votaron los caleños en la elección a la Alcaldía 2023?</h2>
+        <p>Lorem Ipsum</p>
       </section>
 
+      <!-- STEP 1 -->
       <section class="step">
-        <h2>Sólo contornos</h2>
-        <p>Quitamos relleno: dejamos los límites listos para superponer puntos.</p>
+        <h2>¡Visualicemos los resultados!</h2>
+        <p>Primero con un mapa.</p>
       </section>
 
+      <!-- STEP 2 -->
       <section class="step">
-        <h2>(Próximo) Burbujas y comparaciones</h2>
-        <p>En el siguiente paso activaremos nodos por comuna y fuerzas para evitar solapes.</p>
+        <h2>Agreguemos colores</h2>
+        <p>Podemos usar colores para diferenciar quién ganó en cada territorio. Si una comuna o corregimiento votó en su mayoría por <strong>Ortiz</strong> irá en <strong>rojo</strong>, si votó en su mayoría por <strong>Eder</strong> irá en <strong>amarillo</strong>.</p>
       </section>
 
-      <!-- Añade estas secciones debajo de las tres que ya tienes -->
-          <section class="step">
-      <h2>Burbujas por puesto</h2>
-      <p>Cada puesto se convierte en una burbuja: el <strong>tamaño</strong> es el total de votos, el <strong>color</strong> el candidato ganador y la <strong>opacidad</strong> el margen de victoria.</p>
-    </section>
+      <!-- STEP 3 -->
+      <section class="step">
+        <h2>El área geográfica engaña</h2>
+        <p>No es lo mismo las comunas donde Eder ganó con cierto porcentaje que las que Ortiz ganó con un margen diferente. Atenuemos el color según el <strong>margen de victoria</strong>.</p>
+      </section>
 
-    <section class="step">
-      <h2>Márgenes de victoria (puestos)</h2>
-      <p>Reordenamos las burbujas en el eje X por margen de victoria: de ajustado a contundente.</p>
-    </section>
+      <!-- STEP 4 -->
+      <section class="step">
+        <h2>Un círculo por puesto</h2>
+        <p>Mostramos los puestos de votación como <strong>puntos</strong> dentro de los límites (solo contornos) de las comunas, con el color del <strong>ganador</strong> en cada puesto.</p>
+      </section>
 
-    <section class="step">
-      <h2>Peso por total de votos (puestos)</h2>
-      <p>Ahora las organizamos en el eje Y por total de votos para identificar los puestos con mayor peso.</p>
-    </section>
+      <!-- STEP 5 -->
+      <section class="step">
+        <h2>¡Respeta mi burbuja!</h2>
+        <p>Agregamos una fuerza de repulsión para que los puestos no se superpongan, manteniendo su ubicación geográfica.</p>
+      </section>
 
-    <section class="step">
-      <h2>¿Quién ganó más puestos?</h2>
-      <p>Agrupamos en columnas por candidato ganador para ver la distribución de victorias por puesto.</p>
-    </section>
+      <!-- STEP 6 -->
+      <section class="step">
+        <h2>El tamaño es importante</h2>
+        <p>Ahora el <strong>tamaño</strong> de cada burbuja representa el <strong>TOTAL_VOTOS</strong> del puesto y el <strong>color</strong> refleja el <em>margen de victoria</em>.</p>
+      </section>
 
-    <section class="step">
-  <h2>Agrupar por territorio</h2>
-  <p>Las burbujas se organizan en columnas por <em>territorio</em> (según la clasificación del archivo de puestos).</p>
-    </section>
-
-    <section class="step">
-      <h2>Volver al mapa</h2>
-      <p>Regresamos al choropleth de comunas para recapitular el panorama geográfico.</p>
-    </section>
-
-
+      <!-- STEP 7 -->
+      <section class="step">
+        <h2>Todos al centro</h2>
+        <p>Eliminamos la geografía para comparar puestos: agrupamos todas las burbujas en el centro evitando solapes.</p>
+      </section>
     </div>
   </main>
 
   <footer class="site-footer">
-    <small>Fuente: Registraduría / cálculos propios. Datos: <code>votos_comunas.csv</code>, <code>cali_polygon.geojson</code>.</small>
+    <small>Fuentes: Registraduría / cálculos propios — Datos: <code>votos_comunas.csv</code>, <code>votos_puestos.csv</code>, <code>cali_polygon.geojson</code>, <code>puestos.geojson</code>.</small>
   </footer>
 
-  <!-- App (módulos ES) -->
+  <!-- App -->
   <script type="module" src="js/sections.js"></script>
 </body>
 </html>
