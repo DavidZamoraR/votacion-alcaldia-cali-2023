@@ -1,13 +1,14 @@
-// sections.js — Paso 3: añade estados de burbujas y reordenamientos
+// sections.js — Paso 3 (puestos): burbujas + reordenamientos
 import {
   init, toOutline, toChoropleth,
   showPoints, hidePoints,
   toBubbles, hideBubbles,
-  reorderByMargin, reorderByTotal, clusterByWinner
+  reorderByMargin, reorderByTotal, clusterByWinner,
+  clusterByTerritorio      // <--- nuevo
 } from "./engineCali.js";
 
 const steps = [
-  // 0) Choropleth por ganador
+  // 0) Choropleth por ganador (comunas)
   () => { hidePoints(); hideBubbles(); toChoropleth(); },
 
   // 1) Solo contornos
@@ -16,7 +17,7 @@ const steps = [
   // 2) Contornos + puntos (puestos)
   () => { toOutline(); hideBubbles(); showPoints(); },
 
-  // 3) Burbujas: tamaño = total votos
+  // 3) Burbujas por puesto (tamaño = total votos)
   () => { hidePoints(); toBubbles(); },
 
   // 4) Reordenar por margen
@@ -27,6 +28,8 @@ const steps = [
 
   // 6) Agrupar por ganador
   () => { clusterByWinner(); },
+  
+  () => { clusterByTerritorio(); }, 
 
   // 7) (Opcional) volver al mapa coloreado
   () => { hidePoints(); hideBubbles(); toChoropleth(); }
