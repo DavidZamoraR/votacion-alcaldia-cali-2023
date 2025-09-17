@@ -8,8 +8,9 @@
   <!-- CSS -->
   <link rel="stylesheet" href="css/main.css" />
 
-  <!-- D3 (v5) -->
+  <!-- D3 v5 -->
   <script src="https://d3js.org/d3.v5.min.js"></script>
+  <!-- Leyendas -->
   <script src="lib/js/d3-legend.min.js"></script>
 </head>
 <body>
@@ -26,68 +27,71 @@
 
     <!-- Relato / pasos -->
     <div id="sections" aria-label="Secciones del relato">
-      <!-- STEP 0 -->
+      <!-- 0 -->
       <section class="step is-active">
         <h2>¿Cómo votaron los caleños en la elección a la Alcaldía 2023?</h2>
         <p>Lorem Ipsum</p>
       </section>
 
-      <!-- STEP 1 -->
+      <!-- 1 -->
       <section class="step">
         <h2>¡Visualicemos los resultados!</h2>
         <p>Primero con un mapa.</p>
       </section>
 
-      <!-- STEP 2 -->
+      <!-- 2 -->
       <section class="step">
         <h2>Agreguemos colores</h2>
-        <p>Podemos usar colores para diferenciar quién ganó en cada territorio. Si una comuna o corregimiento votó en su mayoría por <strong>Ortiz</strong> irá en <strong>rojo</strong>, si votó en su mayoría por <strong>Eder</strong> irá en <strong>amarillo</strong>.</p>
+        <p>Podemos usar colores para diferenciar quién ganó en cada territorio. Si una comuna o corregimiento votó en su mayoría por Ortiz irá en rojo, si votó en su mayoría por Eder irá en amarillo.</p>
       </section>
 
-      <!-- STEP 3 -->
+      <!-- 3 -->
       <section class="step">
         <h2>El área geográfica engaña</h2>
-        <p>No es lo mismo las comunas donde Eder ganó con cierto porcentaje que las que Ortiz ganó con un margen diferente. Atenuemos el color según el <strong>margen de victoria</strong>.</p>
+        <p>No es lo mismo las comunas donde Eder ganó con cierto porcentaje que las que Ortiz ganó con un margen diferente. Atenuemos el color según el margen de victoria.</p>
       </section>
 
-      <!-- STEP 4 -->
+      <!-- 4 -->
       <section class="step">
         <h2>Un círculo por puesto</h2>
-        <p>Mostramos los puestos de votación como <strong>puntos</strong> dentro de los límites (solo contornos) de las comunas, con el color del <strong>ganador</strong> en cada puesto.</p>
+        <p>Mostramos los puestos como puntos dentro de los límites (solo contornos) de las comunas, con el color del ganador en cada puesto.</p>
       </section>
 
-      <!-- STEP 5 -->
+      <!-- 5 -->
       <section class="step">
         <h2>¡Respeta mi burbuja!</h2>
-        <p>Agregamos una fuerza de repulsión para que los puestos no se superpongan, manteniendo su ubicación geográfica.</p>
+        <p>Agregamos fuerza de colisión para que los puestos no se superpongan, manteniendo su ubicación.</p>
       </section>
 
-      <!-- STEP 6 -->
+      <!-- 6 -->
       <section class="step">
         <h2>El tamaño es importante</h2>
-        <p>Ahora el <strong>tamaño</strong> de cada burbuja representa el <strong>TOTAL_VOTOS</strong> del puesto y el <strong>color</strong> refleja el <em>margen de victoria</em>.</p>
+        <p>El tamaño de cada burbuja representa <strong>TOTAL_VOTOS</strong> y el color refleja el margen de victoria.</p>
       </section>
 
-      <!-- STEP 7 -->
+      <!-- 7 -->
       <section class="step">
         <h2>Todos al centro</h2>
-        <p>Eliminamos la geografía para comparar puestos: agrupamos todas las burbujas en el centro evitando solapes.</p>
+        <p>Eliminamos la geografía y agrupamos todas las burbujas en el centro evitando solapes.</p>
       </section>
+
+      <!-- 8 -->
       <section class="step">
-  <h2>De ajustado a contundente</h2>
-  <p>Ordenamos las burbujas horizontalmente por el <strong>margen de victoria</strong>.</p>
-</section>
+        <h2>De ajustado a contundente</h2>
+        <p>Ordenamos las burbujas horizontalmente por el <strong>margen de victoria</strong>.</p>
+      </section>
 
-    <section class="step">
-      <h2>Los puestos con más votos</h2>
-      <p>Ahora las distribuimos verticalmente según el <strong>total de votos</strong>.</p>
-    </section>
+      <!-- 9 -->
+      <section class="step">
+        <h2>Los puestos con más votos</h2>
+        <p>Distribuimos verticalmente según el <strong>total de votos</strong>.</p>
+      </section>
 
-    <section class="step">
-      <h2>¿Quién gana más puestos?</h2>
-      <p>Agrupamos por <strong>ganador</strong> y mostramos etiquetas de cada cluster.</p>
-    </section>
-
+      <!-- 10 -->
+      <section class="step">
+        <h2>¿Quién gana más puestos?</h2>
+        <p>Agrupamos por <strong>ganador</strong> y mostramos etiquetas por cluster.</p>
+      </section>
     </div>
   </main>
 
@@ -96,6 +100,6 @@
   </footer>
 
   <!-- App -->
-  <script type="module" src="js/sections.js"></script>
+  <script type="module" src="js/sections.js?v=3"></script>
 </body>
 </html>
