@@ -1,18 +1,23 @@
-// sections.js — Steps 0..7 según tu guion
+// sections.js — 0..10
 import {
-  init, toHero, toOutline, toChoroplethSimple, toChoroplethMargin,
-  showPointsStep4, forceSeparateStep5, bubblesByTotalAndMarginStep6, centerAllStep7
+  init,
+  toHero, toOutline, toChoroplethSimple, toChoroplethMargin,
+  showPointsStep4, forceSeparateStep5, bubblesByTotalAndMarginStep6, centerAllStep7,
+  reorderXByMargin, reorderYByTotal, clusterByWinnerLabeled, hideClusterLabels
 } from "./engineCali.js";
 
 const steps = [
-  () => { toHero(); },                 // 0) Intro con fotos
-  () => { toOutline(); },              // 1) Mapa contornos
-  () => { toChoroplethSimple(); },     // 2) Choropleth ganador
-  () => { toChoroplethMargin(); },     // 3) Choropleth con margen
-  () => { showPointsStep4(); },        // 4) Puntos por puesto (color ganador)
-  () => { forceSeparateStep5(); },     // 5) Fuerza de colisión
-  () => { bubblesByTotalAndMarginStep6(); }, // 6) Radio por total + color por margen
-  () => { centerAllStep7(); }          // 7) Todos al centro
+  () => { toHero(); },                         // 0
+  () => { toOutline(); },                      // 1
+  () => { toChoroplethSimple(); },             // 2
+  () => { toChoroplethMargin(); },             // 3
+  () => { showPointsStep4(); },                // 4
+  () => { forceSeparateStep5(); },             // 5
+  () => { bubblesByTotalAndMarginStep6(); },   // 6
+  () => { centerAllStep7(); },                 // 7
+  () => { reorderXByMargin(); },               // 8
+  () => { reorderYByTotal(); },                // 9
+  () => { clusterByWinnerLabeled(); }          // 10
 ];
 
 function setupSections(){
@@ -21,6 +26,8 @@ function setupSections(){
   const setActive = (i) => {
     els.forEach((el, j) => el.classList.toggle("is-active", i===j));
     const fn = steps[i]; if (typeof fn === "function") fn();
+    // si sales del 10, ocultamos etiquetas
+    if (i !== 10) hideClusterLabels();
   };
 
   const io = new IntersectionObserver((entries) => {
@@ -33,6 +40,19 @@ function setupSections(){
   }, { threshold: [0.6] });
 
   els.forEach(el => io.observe(el));
+
+  // activa el step visible al cargar
+  const checkInitial = () => {
+    let bestIdx = 0, bestArea = 0;
+    els.forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+      const visible = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      if (visible > bestArea){ bestArea = visible; bestIdx = i; }
+    });
+    setActive(bestIdx);
+  };
+  checkInitial();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
