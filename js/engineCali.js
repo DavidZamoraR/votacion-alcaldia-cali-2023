@@ -41,22 +41,37 @@ const CANDS = [
   "MIYERLANDI TORRES AGREDO",
   "ROBERTO ORTIZ URUEÑA",
   "WILFREDO PARDO HERRERA",
-  "WILSON RUIZ ORUEJUELA", "WILSON RUIZ ORUEJUELA"
+  "WILSON RUIZ ORUEJUELA"
 ];
 
 // --------------------------- Colores
-const COLOR_EDER  = "#f6d32b"; // amarillo
-const COLOR_ORTIZ = "#d94841"; // rojo
+const COLOR_EDER  = "#e6b800"; // más “oro”
+const COLOR_ORTIZ = "#c4372f"; // rojo más profundo
 
 // --------------------------- Utilidades
 const normalizeTxt = s => (s||"").toString()
   .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
   .toUpperCase().replace(/[\.\-]/g," ").replace(/\s+/g," ").trim();
 
+let selectedTerritory = null;
+
+function applyTerritoryFilter(){
+  const on = !!selectedTerritory;
+  gPts.selectAll("circle")
+    .transition().duration(200)
+    .attr("opacity", d => !on || d.territorio === selectedTerritory ? 1 : 0.18)
+    .attr("stroke-width", d => !on || d.territorio === selectedTerritory ? 1.4 : 0.6);
+}
+
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-const opacityByMargin = m => clamp(0.35 + (m||0)*0.9, 0.35, 1);
-const mixEder  = d3.interpolateRgb("#fff6bf", COLOR_EDER);
-const mixOrtiz = d3.interpolateRgb("#ffd9d5", COLOR_ORTIZ);
+const opacityByMargin = m => clamp(0.55 + (m||0)*0.7, 0.55, 1);
+const mixEder  = d3.interpolateRgb("#f9e093", COLOR_EDER);
+const mixOrtiz = d3.interpolateRgb("#f5b3ae", COLOR_ORTIZ);
+
+// Discretizador de márgenes (0–10–20–40–60–80–100)
+const marginBins = d3.scaleThreshold()
+  .domain([0.10, 0.20, 0.40, 0.60, 0.80])            // márgenes en proporción
+  .range([0.05, 0.15, 0.30, 0.50, 0.70, 0.90]);      // intensidades (0..1)
 
 // fuerza de caja para mantener nodos dentro del SVG
 function forceBox(pad = 24){
@@ -111,7 +126,7 @@ export async function init(){
   geoComunas = geojson;
   csvComunasMap = new Map(rows.map(r => [normalizeTxt(r["Nombre Comuna"]), r]));
 
-  // métricas por comuna (sin usar %_Eder/%_Ortiz aquí)
+  // métricas por comuna
   geoComunas.features.forEach(f => {
     const key = normalizeTxt(f.properties.id);
     const row = csvComunasMap.get(key);
@@ -221,32 +236,32 @@ function drawLegendsPro({ showWinner=true, showMargins=false } = {}){
 
   // (2) discreta: márgenes por bins 0–10–20–40–60–80–100
   if (showMargins){
-    const y0 = showWinner ? 86 : 0;
-    const bins = [0,10,20,40,60,80,100]; // %
-    const binMids = bins.slice(0,-1).map((b,i)=> (b + bins[i+1]) / 200); // mid 0..1
-    const w = 18, h = 12, gap = 4;
+    const y0 = showWinner ? 96 : 4;      // más separación del bloque de ganador
+    const bins = [0,10,20,40,60,80,100];
+    const binMids = bins.slice(0,-1).map((b,i)=> (b + bins[i+1]) / 200);
+    const w = 22, h = 12, gap = 6;
 
-    const makeRow = (label, colors) => {
-      const g = wrap.append("g").attr("transform", `translate(0, ${label==="Margen Eder"? y0 : y0+30})`);
-      g.append("text").attr("x",0).attr("y",-6).attr("font-size",12).attr("fill","#374151").text(label);
+    const makeRow = (label, colors, rowIdx) => {
+      const yRow = y0 + rowIdx * 48;     // 48px entre filas → no se pisan
+      const g = wrap.append("g").attr("transform", `translate(0, ${yRow})`);
+      g.append("text").attr("x",0).attr("y",-8).attr("font-size",12)
+        .attr("fill","#374151").text(label);
 
-      const boxes = g.append("g");
+      const boxes = g.append("g").attr("transform","translate(64,0)"); // desplaza cajitas a la derecha
       binMids.forEach((m,i)=>{
         boxes.append("rect")
           .attr("x", i*(w+gap)).attr("y", 0)
           .attr("width", w).attr("height", h)
-          .attr("fill", colors(m)).attr("stroke","#aaa").attr("stroke-width",0.5);
-        if (i % 2 === 0){
-          g.append("text")
-            .attr("x", i*(w+gap)+w/2).attr("y", h+12)
-            .attr("text-anchor","middle").attr("font-size",10).attr("fill","#111827")
-            .text(`${bins[i]}–${bins[i+1]}%`);
-        }
+          .attr("fill", colors(m)).attr("stroke","#888").attr("stroke-width",0.5);
+        g.append("text")
+          .attr("x", 64 + i*(w+gap) + w/2).attr("y", h+12)
+          .attr("text-anchor","middle").attr("font-size",10).attr("fill","#111827")
+          .text(`${bins[i]}–${bins[i+1]}%`);
       });
     };
 
-    makeRow("Margen Eder",  m => mixEder(m));
-    makeRow("Margen Ortiz", m => mixOrtiz(m));
+    makeRow("Margen Eder",  m => mixEder(m), 0);
+    makeRow("Margen Ortiz", m => mixOrtiz(m), 1);
   }
 }
 function showLegendWinnerOnly(){ drawLegendsPro({ showWinner:true, showMargins:false }); }
@@ -262,19 +277,21 @@ export function toHero(){
 export function toOutline(){
   gHero.transition().duration(300).attr("opacity", 0).on("end", ()=> gHero.style("display","none"));
   gMap.style("display", null).transition().duration(500).attr("opacity", 1);
-  gMap.selectAll("path").transition().duration(500).attr("fill","none").attr("stroke","#aaa").attr("pointer-events","none");
+  gMap.selectAll("path").transition().duration(500)
+    .attr("fill","none").attr("stroke","#aaa").attr("pointer-events","none");
   gPts.transition().duration(250).attr("opacity", 0);
   clearLegends(); gUI.style("display","none");
 }
 export function toChoroplethSimple(){
-  gMap.style("display", null).transition().duration(400).attr("opacity", 1).attr("pointer-events","none");
+  gMap.style("display", null).transition().duration(400).attr("opacity", 1);
   gMap.selectAll("path").transition().duration(500)
     .attr("stroke","#999")
     .attr("fill", d => {
       const m = d.properties.metrics;
       return m ? winnerColorOnlyEderOrtiz(m.winner) : "#eee";
     })
-    .attr("fill-opacity", 1);
+    .attr("fill-opacity", 1)
+    .attr("pointer-events","none");      // evita tapar puntos
   showLegendWinnerOnly();
 }
 export function toChoroplethMargin(){
@@ -286,8 +303,10 @@ export function toChoroplethMargin(){
       return m ? winnerColorOnlyEderOrtiz(m.winner) : "#eee";
     })
     .attr("fill-opacity", d => {
-      const m = d.properties.metrics || {};
-      return opacityByMargin(m.margin || 0);
+      const m = (d.properties.metrics || {}).margin || 0;
+      // opacidad DISCRETA por bins
+      return marginBins(m);
+      // Si quieres continua, usa: return opacityByMargin(m);
     })
     .attr("pointer-events","none");
   showLegendWinnerAndMargins();
@@ -403,7 +422,10 @@ function colorWinner(d){
 }
 function colorByMargin(d){
   const w = normalizeTxt(d.winner);
-  const m = clamp(d.margin || 0, 0, 1);
+  // Intensidad discreta para mayor contraste:
+  const m = marginBins(clamp(d.margin || 0, 0, 1));
+  // Si prefieres continua, cambia la línea anterior por:
+  // const m = clamp(d.margin || 0, 0, 1);
   if (w === normalizeTxt("ALVARO ALEJANDRO EDER GARCES")) return mixEder(m);
   if (w === normalizeTxt("ROBERTO ORTIZ URUEÑA"))         return mixOrtiz(m);
   return d3.interpolateRgb("#e9e5fb", "#5b5bd7")(m*0.9 + 0.1);
@@ -425,7 +447,7 @@ function bindPointEvents(){
   const barW = 160, barH = 10;
 
   gPts.selectAll("circle")
-    .style("cursor","pointer") // UX
+    .style("cursor","pointer")
     .on("mousemove", function(){
       const ev = d3.event; // d3 v5
       tip.style("left", (ev.clientX + 14) + "px")
@@ -470,62 +492,130 @@ function bindPointEvents(){
     })
     .on("mouseout", function(){
       tip.transition().duration(120).style("opacity",0);
-      d3.select(this).attr("stroke-width",0.7);
+      d3.select(this).attr("stroke-width",0.9);  // baseline coherente
+    })
+    .on("click", function(d){
+      d3.event.stopPropagation();
+      selectedTerritory = (selectedTerritory === d.territorio) ? null : d.territorio;
+      applyTerritoryFilter();
+    })
+    .on("touchstart", function(d){
+      d3.event.stopPropagation();
+      selectedTerritory = (selectedTerritory === d.territorio) ? null : d.territorio;
+      applyTerritoryFilter();
     });
 }
 
 // ---- Steps puestos
+// ---- Steps puestos
 export async function showPointsStep4(){
   await ensurePuestosData();
 
-  gPts.interrupt().style("display", null).attr("opacity", 1).raise();
+  // Orden de capas y visibilidad
   gMap.lower();
+  gPts.raise();
+  gUI.raise();
+  gPts.interrupt().style("display", null).attr("opacity", 1);
 
-  gMap.style("display", null).transition().duration(400).attr("opacity", 1);
-  gMap.selectAll("path").transition().duration(400).attr("fill","none").attr("stroke","#bbb") .attr("pointer-events","none"); 
+  // Mapa: solo contorno
+  gMap.style("display", null)
+      .transition().duration(250)
+      .attr("opacity", 1);
+  gMap.selectAll("path")
+      .interrupt()
+      .attr("fill", "none")
+      .attr("stroke", "#bbb")
+      .attr("pointer-events", "none");
 
+  // JOIN
   const sel = gPts.selectAll("circle").data(nodes, d => d.id);
-  sel.enter().append("circle")
-    .attr("r", 0)
-    .attr("cx", d => d.x0).attr("cy", d => d.y0)
+
+  const ent = sel.enter().append("circle")
+    .attr("cx", d => d.x0)
+    .attr("cy", d => d.y0)
+    .attr("r", 0)  // inicial (no confiamos en la transición para el final)
     .attr("fill", d => colorWinner(d))
-    .attr("stroke", "#fff").attr("stroke-width", 0.7)
-    .style("pointer-events","all")
     .attr("fill-opacity", 0.95)
-    .transition().duration(350)
-    .attr("r", PTS_R_STEP4);
-  sel.transition().duration(250).attr("opacity", 1);
+    .attr("stroke", "#111")
+    .attr("stroke-opacity", 0.9)
+    .attr("stroke-width", 0.9)
+    .attr("vector-effect", "non-scaling-stroke")
+    .style("pointer-events", "all");
+
+  // FORZAR radio final *sin transición* (parche anti-interrupción)
+  ent.merge(sel)
+     .interrupt()                 // cancela cualquier transición previa en curso
+     .attr("opacity", 1)
+     .attr("r", PTS_R_STEP4)      // <-- clave: radio inmediato
+     .attr("visibility", "visible");
+
+  sel.exit().remove();
+
+  console.log("[step4] circles enter:", ent.size(), "total:", gPts.selectAll("circle").size());
 
   bindPointEvents();
+  applyTerritoryFilter();
   clearLegends(); gUI.style("display","none");
 }
+
 export function forceSeparateStep5(){
-  if (!simulation) return;
-  gPts.interrupt().style("display", null).attr("opacity", 1).raise();
+  if (!simulation || !rScale) return;
+
+  // Asegura z-order y visibilidad del layer de puntos
+  gMap.lower();
+  gPts.raise().attr("opacity", 1);
+
+  // ——— Tamaño y color desde Step 5 ———
+  gPts.selectAll("circle")
+    .interrupt() // evita que se queden con r=0 si hubo transición previa cortada
+    .attr("r", d => rScale(d.total))      // tamaño ∝ TOTAL_VOTOS
+    .attr("fill", d => colorByMargin(d))  // color por margen (como Step 3)
+    .attr("fill-opacity", 0.95)
+    .attr("stroke", "#111")
+    .attr("stroke-opacity", 0.9)
+    .attr("stroke-width", 0.9);
+
+  // Fuerzas: colisión en función del radio actual y anclas a su x0,y0
   simulation
-    .force("collide", d3.forceCollide(PTS_R_STEP4 + COLL_PAD))
-    .force("x", d3.forceX(d => d.x0).strength(0.25))
-    .force("y", d3.forceY(d => d.y0).strength(0.25))
-    .alpha(0.9).restart();
+    .force("collide", d3.forceCollide(d => rScale(d.total) + COLL_PAD))
+    .force("x", d3.forceX(d => d.x0).strength(0.20))
+    .force("y", d3.forceY(d => d.y0).strength(0.20))
+    .alpha(0.8).restart();
+
+  // Tooltips y filtro por territorio siguen funcionando
+  bindPointEvents();
+  applyTerritoryFilter();
+
+  // Sin leyendas en este paso
+  clearLegends(); 
+  gUI.style("display","none");
 }
 export function bubblesByTotalAndMarginStep6(){
   if (!simulation || !rScale) return;
+
   gPts.interrupt().style("display", null).attr("opacity", 1).raise();
 
+  // Reafirma tamaño y color (idempotente)
   gPts.selectAll("circle")
-    .transition().duration(500)
+    .interrupt()
     .attr("r", d => rScale(d.total))
     .attr("fill", d => colorByMargin(d))
-    .attr("fill-opacity", 0.95);
+    .attr("fill-opacity", 0.95)
+    .attr("stroke", "#111")
+    .attr("stroke-opacity", 0.9)
+    .attr("stroke-width", 0.9);
 
+  // Un poco más de fuerza para resolver solapes al aumentar radios
   simulation
     .force("collide", d3.forceCollide(d => rScale(d.total) + COLL_PAD))
-    .force("x", d3.forceX(d => d.x0).strength(0.18))
-    .force("y", d3.forceY(d => d.y0).strength(0.18))
-    .alpha(0.7).restart();
+    .force("x", d3.forceX(d => d.x0).strength(0.22))
+    .force("y", d3.forceY(d => d.y0).strength(0.22))
+    .alpha(0.8).restart();
 
   bindPointEvents();
+  applyTerritoryFilter();
 }
+
 export function centerAllStep7(){
   if (!simulation) return;
   gMap.transition().duration(500).attr("opacity", 0).on("end", () => gMap.style("display","none"));
@@ -555,6 +645,7 @@ export function reorderXByMargin(){
     .alpha(0.9).restart();
 
   bindPointEvents();
+  applyTerritoryFilter();   // <-- mantener filtro activo tras reordenar
 }
 export function reorderYByTotal(){
   if (!nodes?.length || !simulation) return;
@@ -568,6 +659,7 @@ export function reorderYByTotal(){
     .alpha(0.9).restart();
 
   bindPointEvents();
+  applyTerritoryFilter();   // <--
 }
 export function clusterByWinnerLabeled(){
   if (!nodes?.length || !simulation) return;
@@ -604,7 +696,13 @@ export function clusterByWinnerLabeled(){
   labs.exit().remove();
 
   bindPointEvents();
+  applyTerritoryFilter();   // <--
 }
 export function hideClusterLabels(){
   if (gClusterLabels) gClusterLabels.selectAll("text").remove();
 }
+
+svg.on("click", () => {
+  selectedTerritory = null;
+  applyTerritoryFilter();
+});

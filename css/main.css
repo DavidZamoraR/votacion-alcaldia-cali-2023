@@ -16,6 +16,8 @@ body{
   color: var(--fg);
   background: #fde5c4;
   line-height: 1.35;
+  -webkit-font-smoothing: antialiased; /* PATCH: legibilidad */
+  -moz-osx-font-smoothing: grayscale;  /* PATCH */
 }
 
 .site-header, .site-footer{
@@ -35,28 +37,68 @@ body{
   background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px;
   height: calc(100vh - 24px);
   min-height: 540px; display: grid; place-items: center; padding: 8px;
+  overflow-anchor: none; /* PATCH: evita “anchoring” dentro del sticky */
 }
 #vis{ width: 100%; height: 100%; }
+/* asegura que el grupo de puntos no quede visualmente "debajo" por blending del contenedor */
+#vis .points { isolation: isolate; }
+
+
 
 #vTooltip { background: #fde5c4aa; }  
 
-#sections{ padding: 4px 8px; }
+#sections{ padding: 4px 8px; overflow-anchor: none; /* PATCH */ }
+
 .step{
   background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
   padding: 16px 16px; margin: 12px 0;
   box-shadow: 0 1px 0 rgba(0,0,0,0.02);
-  min-height: 70vh;             /* <-- clave para generar scroll */
+  min-height: 85vh;             /* PATCH: ↑ 70vh → 85vh para activación estable */
   display: flex;
   flex-direction: column;
   justify-content: center;
   margin: 4vh 0;
+  overflow-anchor: none;        /* PATCH: cada step sin anclaje */
 }
 .step h2{ margin: 6px 0 8px; font-size: 18px; }
 .step p{ margin: 0; color: var(--accent); }
-.step.is-active{ outline: 2px solid #1118270f; }
+/* PATCH: estado activo solo cambia lo visual; no toques height/margin/padding/border-width */
+.step.is-active{ 
+  outline: 2px solid #1118270f; 
+  /* no cambiar: margin/padding/border-width/font-size/line-height */
+}
 
 .site-footer{ color: var(--muted); }
 code{ background: #f3f4f6; padding: 0 4px; border-radius: 4px; }
 
 svg{ width: 100%; height: 100%; display: block; }
 .legend-winner text, .legend-margins text { paint-order: stroke; }
+
+/* --- SVG fluido --- */
+#vis svg { width: 100%; height: auto; display: block; }
+
+/* Layout base (desktop) */
+.container{
+  display:flex; gap:24px; align-items:flex-start;
+}
+#graphic{ position: sticky; top: 16px; flex: 1 1 58ch; }
+#sections{ flex: 1 1 48ch; }
+
+/* Pasos */
+.step{ margin: 2rem 0; }
+
+/* Tooltip (por si estilos globales lo pisan) */
+#vTooltip{ max-width: 320px; }
+
+/* --- Responsive móvil --- */
+@media (max-width: 900px){
+  .container{ display:block; }
+  #graphic{ position: relative; top: 0; margin-bottom: 16px; }
+  #sections{ width: 100%; }
+  .step{ margin: 1.5rem 0; min-height: 80vh; } /* PATCH: asegura altura útil en móvil */
+}
+
+/* (Opcional) Accesibilidad: respeta reduce motion */
+@media (prefers-reduced-motion: reduce){
+  * { scroll-behavior: auto !important; }
+}
