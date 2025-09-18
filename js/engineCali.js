@@ -379,6 +379,8 @@ async function ensurePuestosData(){
     };
     const pctEder  = parsePct(row["%_Eder"])  ?? (total ? eder/total : null);
     const pctOrtiz = parsePct(row["%_Ortiz"]) ?? (total ? ortiz/total : null);
+    const diffEO    = ((pctEder ?? (total ? eder/total : 0)) - (pctOrtiz ?? (total ? ortiz/total : 0)));
+    const absDiffEO = Math.abs(diffEO);
 
     nodes.push({
       id: gid,
@@ -388,6 +390,7 @@ async function ensurePuestosData(){
       ederVotes: eder,
       ortizVotes: ortiz,
       pctEder, pctOrtiz,
+      diffEO, absDiffEO,
       x: xy[0], y: xy[1],
       x0: xy[0], y0: xy[1]
     });
@@ -458,6 +461,10 @@ function bindPointEvents(){
       const pctE = (d.pctEder  != null) ? d.pctEder  : (d.total ? d.ederVotes/d.total : 0);
       const pctO = (d.pctOrtiz != null) ? d.pctOrtiz : (d.total ? d.ortizVotes/d.total : 0);
       const mCalc = (pctE - pctO);
+      // diferencia firmada Eder - Ortiz
+      const diffEO = pctE - pctO;
+      const diffAbs = Math.abs(diffEO);
+      const dir = diffEO >= 0 ? "Eder" : "Ortiz";
 
       // ancho de barra para cada candidato
       const wE = Math.max(0, Math.min(1, pctE)) * barW;
@@ -484,7 +491,7 @@ function bindPointEvents(){
           <div>Ortiz: <strong>${fmtNum(d.ortizVotes)}</strong></div>
           <div>Total: <strong>${fmtNum(d.total)}</strong></div>
           <div>Ganador: <strong>${d.winner || "—"}</strong></div>
-          <div>Margen: <strong>${fmtPct(Math.max(-1, Math.min(1, mCalc)))}</strong></div>
+          <div>Margen: <strong>${fmtPct(diffAbs)}</strong> a favor de <strong>${dir}</strong></div>
           ${barHTML}
         </div>`;
       tip.html(html).transition().duration(120).style("opacity",0.98);
@@ -636,17 +643,31 @@ export function reorderXByMargin(){
   if (!nodes?.length || !simulation) return;
   hideClusterLabels();
 
-  const minM = d3.min(nodes, d => d.margin) ?? 0;
-  const maxM = d3.max(nodes, d => d.margin) ?? 1e-6;
-  const x = d3.scaleLinear().domain([minM, maxM]).range([60, width-60]);
+  // Tomamos el máximo valor absoluto de la diferencia Eder-Ortiz (firmada)
+  const maxAbs = d3.max(nodes, d => Math.abs(
+    d.diffEO != null ? d.diffEO :
+    ((d.pctEder ?? 0) - (d.pctOrtiz ?? 0))
+  )) || 1e-6;
+
+  const pad = 80; // margen a los lados
+  const x = d3.scaleLinear()
+    .domain([-maxAbs, maxAbs])     // simétrico (izq: Ortiz, der: Eder)
+    .range([pad, width - pad]);
 
   simulation
-    .force("x", d3.forceX(d => x(d.margin)).strength(0.28))
+    .force("x", d3.forceX(d => {
+      const signed = (d.diffEO != null)
+        ? d.diffEO
+        : ((d.pctEder ?? 0) - (d.pctOrtiz ?? 0));
+      return x(signed);
+    }).strength(0.30))
+    // mantenemos y más o menos centrado para el “abanico”
+    .force("y", d3.forceY(height/2).strength(0.06))
     .alpha(0.9).restart();
 
   bindPointEvents();
-  applyTerritoryFilter();   // <-- mantener filtro activo tras reordenar
 }
+
 export function reorderYByTotal(){
   if (!nodes?.length || !simulation) return;
   hideClusterLabels();
