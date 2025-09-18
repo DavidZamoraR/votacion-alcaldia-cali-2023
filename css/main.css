@@ -5,19 +5,20 @@
   --accent:#111827;
   --step-w: min(540px, 42vw);
   --vis-w: min(960px, 56vw);
+  --vis-top-gap: 18svh
+  --vis-bottom-gap: 6svh; 
+
 }
 
+/* ===== Base ===== */
 *{ box-sizing: border-box; }
-
 html,body{ margin:0; padding:0; }
-
 body{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji";
   color: var(--fg);
   background: #fde5c4;
   line-height: 1.35;
-  -webkit-font-smoothing: antialiased; /* PATCH: legibilidad */
-  -moz-osx-font-smoothing: grayscale;  /* PATCH */
+  overscroll-behavior-y: contain;
 }
 
 .site-header, .site-footer{
@@ -26,6 +27,7 @@ body{
 .site-header h1{ margin: 8px 0 4px; font-size: clamp(22px, 2.6vw, 34px); }
 .subtitle{ color: var(--muted); margin: 0; }
 
+/* ===== Desktop / tablets anchos ===== */
 .container{
   max-width: 1200px; margin: 0 auto; display: grid; gap: 12px;
   grid-template-columns: minmax(280px, var(--vis-w)) minmax(260px, var(--step-w));
@@ -37,68 +39,125 @@ body{
   background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px;
   height: calc(100vh - 24px);
   min-height: 540px; display: grid; place-items: center; padding: 8px;
-  overflow-anchor: none; /* PATCH: evita “anchoring” dentro del sticky */
+  padding-top: var(--vis-top-gap);
+  padding-bottom: var(--vis-bottom-gap);
 }
-#vis{ width: 100%; height: 100%; }
-/* asegura que el grupo de puntos no quede visualmente "debajo" por blending del contenedor */
-#vis .points { isolation: isolate; }
+#vis{ width: 100%; height: calc(100% - var(--vis-top-gap) - var(--vis-bottom-gap)); }
+svg{ width: 100%; height: 100%; display: block; }
+#vis svg { width: 100%; height: auto; display: block; }
 
-
-
-#vTooltip { background: #fde5c4aa; }  
-
-#sections{ padding: 4px 8px; overflow-anchor: none; /* PATCH */ }
-
+#sections{ padding: 4px 8px; }.step:first-child{
+    margin-top: calc(90svh - var(--vis-top-gap));
+  }
 .step{
   background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
   padding: 16px 16px; margin: 12px 0;
   box-shadow: 0 1px 0 rgba(0,0,0,0.02);
-  min-height: 85vh;             /* PATCH: ↑ 70vh → 85vh para activación estable */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  min-height: 70vh;
+  display: flex; flex-direction: column; justify-content: center;
   margin: 4vh 0;
-  overflow-anchor: none;        /* PATCH: cada step sin anclaje */
 }
 .step h2{ margin: 6px 0 8px; font-size: 18px; }
 .step p{ margin: 0; color: var(--accent); }
-/* PATCH: estado activo solo cambia lo visual; no toques height/margin/padding/border-width */
-.step.is-active{ 
-  outline: 2px solid #1118270f; 
-  /* no cambiar: margin/padding/border-width/font-size/line-height */
-}
+.step.is-active{ outline: 2px solid #1118270f; }
 
 .site-footer{ color: var(--muted); }
 code{ background: #f3f4f6; padding: 0 4px; border-radius: 4px; }
 
-svg{ width: 100%; height: 100%; display: block; }
+/* Leyendas (stroke para legibilidad sobre el mapa) */
 .legend-winner text, .legend-margins text { paint-order: stroke; }
 
-/* --- SVG fluido --- */
-#vis svg { width: 100%; height: auto; display: block; }
-
-/* Layout base (desktop) */
-.container{
-  display:flex; gap:24px; align-items:flex-start;
-}
-#graphic{ position: sticky; top: 16px; flex: 1 1 58ch; }
-#sections{ flex: 1 1 48ch; }
-
-/* Pasos */
-.step{ margin: 2rem 0; }
-
-/* Tooltip (por si estilos globales lo pisan) */
-#vTooltip{ max-width: 320px; }
-
-/* --- Responsive móvil --- */
+/* ===== Móvil: layout tipo John Guerra ===== */
 @media (max-width: 900px){
-  .container{ display:block; }
-  #graphic{ position: relative; top: 0; margin-bottom: 16px; }
-  #sections{ width: 100%; }
-  .step{ margin: 1.5rem 0; min-height: 80vh; } /* PATCH: asegura altura útil en móvil */
-}
 
-/* (Opcional) Accesibilidad: respeta reduce motion */
-@media (prefers-reduced-motion: reduce){
-  * { scroll-behavior: auto !important; }
+  /* El contenedor ya no usa grid; #graphic se coloca FIJO al fondo */
+  .container{
+    position: relative;
+    display: block;
+    padding: 0;
+  }
+
+  /* Visualización a pantalla completa, detrás de todo */
+  #graphic{
+    position: fixed !important;
+    inset: 0;
+    height: 100svh !important;
+    width: 100vw !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    z-index: 0;         /* detrás */
+  }
+  #vis{ width:100%; height:100%; touch-action: pan-y; }
+
+  /* La columna de pasos va encima, pero NO bloquea toques salvo el texto */
+  #sections{
+    position: relative;
+    z-index: 1;
+    padding: 0 0 16svh 0;    /* un poco de colita al final */
+    pointer-events: none;    /* clave: deja pasar taps al mapa */
+  }
+
+  /* Cada step es totalmente transparente y angosto; espacio grande
+     arriba/abajo para asegurar 1 step por pantalla */
+  #sections .step{
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    display: block;
+    width: auto;
+    max-width: min(520px, 92vw);
+    margin: 70svh 12px;      /* << GRAN espacio vertical: 1 activo a la vez */
+    padding: 0;
+    min-height: auto;
+    pointer-events: none;    /* área vacía no intercepta */
+  }
+
+  /* El contenido sí recibe interacción (links, selección, etc.) */
+  #sections .step > *{
+    pointer-events: auto;
+    background: transparent !important;
+  }
+
+  /* Títulos y párrafos */
+  #sections .step h2{
+    margin: 0 0 6px 0;
+    font-size: clamp(18px, 5.3vw, 22px);
+    line-height: 1.25;
+  }
+  #sections .step p{
+    margin: 0;
+    color: #111827;
+    font-size: clamp(14px, 4.2vw, 16px);
+  }
+
+  /* Indicador del step activo (sutil, no tapa nada) */
+  #sections .step.is-active{ outline: 2px solid rgba(17,24,39,0.18) !important; }
+
+  /* Tooltip nunca excesivo */
+  #vTooltip{ max-width: 320px; }
+
+  /* 1) knobs: separaciones arriba/abajo del gráfico fijo */
+  :root{
+    --vis-top-gap: 18svh;     /* sube/baja este número: 16–24svh suele ir bien */
+    --vis-bottom-gap: 6svh;   /* colita inferior opcional */
+  }
+
+  /* 2) empujamos el gráfico hacia abajo dejando “aire” para el texto */
+  #graphic{
+    padding-top: var(--vis-top-gap);
+    padding-bottom: var(--vis-bottom-gap);
+  }
+  /* el contenedor de la visual ocupa el resto de alto */
+  #vis{
+    height: calc(100% - var(--vis-top-gap) - var(--vis-bottom-gap));
+  }
+
+  /* 3) primer paso: deja una rampa inicial para que no se pise con el héroe */
+  #sections .step:first-child{
+    margin-top: calc(90svh - var(--vis-top-gap));
+  }
+
+
 }
