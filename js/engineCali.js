@@ -83,6 +83,23 @@ function forceBox(pad = 24){
   };
 }
 
+// Bloquea cada nodo al "lado correcto" del 0% según el ganador.
+// xZero: posición del 0% en píxeles. pad: pequeño margen para que no queden pegados.
+function forceSideLockFactory(xZero, pad = 6){
+  const wE = normalizeTxt("ALVARO ALEJANDRO EDER GARCES");
+  const wO = normalizeTxt("ROBERTO ORTIZ URUEÑA");
+  return function sideLock(){
+    for (const d of nodes){
+      const w = normalizeTxt(d.winner);
+      if (w === wE && d.x < xZero + pad) d.x = xZero + pad;
+      else if (w === wO && d.x > xZero - pad) d.x = xZero - pad;
+    }
+  };
+}
+
+
+
+
 // helpers join
 function pickKey(obj, candidates){
   for (const k of candidates){
@@ -115,6 +132,69 @@ let rScale = null;
 let simulation = null;
 const PTS_R_STEP4 = 5.2;
 const COLL_PAD    = 1.2;
+// --- Capa de eje X para el paso 8
+let gAxis = null;
+let xMarginScale = null;
+
+function ensureAxisLayer(){
+  if (!gAxis) {
+    gAxis = svg.append("g")
+      .attr("class", "x-axis-margin")
+      .style("pointer-events","none")
+      .style("display","none");
+  }
+}
+
+// Dibuja/actualiza el eje (ticks abajo) + línea vertical en 0%
+function showXAxisForMargin(scale){
+  ensureAxisLayer();
+  xMarginScale = scale;
+
+  const axisY = height - 22;              // altura del eje (pegado abajo)
+  const x0 = xMarginScale(0);
+
+  gAxis.style("display", null).raise();
+
+  // eje abajo (ticks y %)
+  const axis = d3.axisBottom(xMarginScale)
+    .ticks(6)
+    .tickFormat(d3.format(".0%"));
+
+  const gx = gAxis.selectAll("g.axis").data([null]);
+  gx.enter().append("g").attr("class","axis")
+     .merge(gx)
+     .attr("transform", `translate(0,${axisY})`)
+     .call(axis);
+
+  // línea vertical en 0%
+  const v = gAxis.selectAll("line.zero").data([null]);
+  v.enter().append("line").attr("class","zero")
+    .merge(v)
+    .attr("x1", x0).attr("x2", x0)
+    .attr("y1", 56).attr("y2", axisY-8)   // desde arriba del área hasta el eje
+    .attr("stroke", "#111").attr("stroke-width", 1)
+    .attr("stroke-dasharray", "3,3").attr("opacity", .8);
+
+  // etiquetas “Ortiz” a la izquierda y “Eder” a la derecha
+  const labels = [
+    {x: xMarginScale.range()[0], txt: "Ortiz", anchor:"start"},
+    {x: xMarginScale.range()[1], txt: "Eder",  anchor:"end"}
+  ];
+  const gl = gAxis.selectAll("text.side-label").data(labels);
+  gl.enter().append("text").attr("class","side-label")
+    .merge(gl)
+    .attr("x", d=>d.x).attr("y", axisY+16)
+    .attr("text-anchor", d=>d.anchor)
+    .attr("font-size", 12).attr("fill", "#374151")
+    .text(d=>d.txt);
+  gl.exit().remove();
+}
+
+function hideXAxis(){
+  if (gAxis) gAxis.style("display","none");
+}
+
+
 
 // --------------------------- INIT
 export async function init(){
@@ -193,7 +273,7 @@ function drawMapSkeleton(){
   const feat = gMap.selectAll("path").data(geoComunas.features, d => d.properties.id);
   feat.enter().append("path")
     .attr("d", path)
-    .attr("stroke", "#999")
+    .attr("stroke", "#1b1b1bff")
     .attr("fill", "none");
 }
 function winnerColorOnlyEderOrtiz(winner){
@@ -272,6 +352,8 @@ export function toHero(){
   gHero.style("display", null).transition().duration(400).attr("opacity", 1);
   gMap.transition().duration(300).attr("opacity", 0.08);
   gPts.transition().duration(300).attr("opacity", 0);
+  hideXAxis();
+if (simulation) simulation.force("sideLock", null); 
   clearLegends(); gUI.style("display","none");
 }
 export function toOutline(){
@@ -281,6 +363,8 @@ export function toOutline(){
     .attr("fill","none").attr("stroke","#aaa").attr("pointer-events","none");
   gPts.transition().duration(250).attr("opacity", 0);
   clearLegends(); gUI.style("display","none");
+  hideXAxis();
+if (simulation) simulation.force("sideLock", null); 
 }
 export function toChoroplethSimple(){
   gMap.style("display", null).transition().duration(400).attr("opacity", 1);
@@ -293,6 +377,8 @@ export function toChoroplethSimple(){
     .attr("fill-opacity", 1)
     .attr("pointer-events","none");      // evita tapar puntos
   showLegendWinnerOnly();
+  hideXAxis();
+if (simulation) simulation.force("sideLock", null);
 }
 export function toChoroplethMargin(){
   gMap.style("display", null).transition().duration(400).attr("opacity", 1);
@@ -310,6 +396,8 @@ export function toChoroplethMargin(){
     })
     .attr("pointer-events","none");
   showLegendWinnerAndMargins();
+  hideXAxis();
+if (simulation) simulation.force("sideLock", null);
 }
 
 // --------------------------- PUESTOS (Steps 4..7)
@@ -381,6 +469,7 @@ async function ensurePuestosData(){
     const pctOrtiz = parsePct(row["%_Ortiz"]) ?? (total ? ortiz/total : null);
     const diffEO    = ((pctEder ?? (total ? eder/total : 0)) - (pctOrtiz ?? (total ? ortiz/total : 0)));
     const absDiffEO = Math.abs(diffEO);
+    const signedMargin = (pctEder ?? 0) - (pctOrtiz ?? 0); // negativo = Ortiz, positivo = Eder
 
     nodes.push({
       id: gid,
@@ -391,6 +480,7 @@ async function ensurePuestosData(){
       ortizVotes: ortiz,
       pctEder, pctOrtiz,
       diffEO, absDiffEO,
+      signedMargin,                                  // <-- NUEVO
       x: xy[0], y: xy[1],
       x0: xy[0], y0: xy[1]
     });
@@ -399,7 +489,7 @@ async function ensurePuestosData(){
   // escalas y simulación
   rScale = d3.scaleSqrt()
     .domain([0, d3.max(nodes, d => d.total)||1])
-    .range([6, 28]);
+    .range([2, 25]);
 
   simulation = d3.forceSimulation(nodes)
     .force("collide", d3.forceCollide(() => PTS_R_STEP4 + COLL_PAD))
@@ -514,59 +604,95 @@ function bindPointEvents(){
 }
 
 // ---- Steps puestos
-// ---- Steps puestos
-export async function showPointsStep4(){
-  await ensurePuestosData();
+// --- Bandera para no re-crear los círculos y util para resetear
+let pointsDrawnOnce = false;
 
-  // Orden de capas y visibilidad
-  gMap.lower();
-  gPts.raise();
-  gUI.raise();
-  gPts.interrupt().style("display", null).attr("opacity", 1);
+function resetNodesToOrigin() {
+  // 1) poner las coordenadas de simulación de vuelta al origen
+  nodes.forEach(d => {
+    d.x = d.x0;
+    d.y = d.y0;
+  });
 
-  // Mapa: solo contorno
-  gMap.style("display", null)
-      .transition().duration(250)
-      .attr("opacity", 1);
-  gMap.selectAll("path")
-      .interrupt()
-      .attr("fill", "none")
-      .attr("stroke", "#bbb")
-      .attr("pointer-events", "none");
-
-  // JOIN
-  const sel = gPts.selectAll("circle").data(nodes, d => d.id);
-
-  const ent = sel.enter().append("circle")
+  // 2) actualizar el DOM sin animación (o con una corta)
+  gPts.selectAll("circle")
+    .interrupt()
     .attr("cx", d => d.x0)
     .attr("cy", d => d.y0)
-    .attr("r", 0)  // inicial (no confiamos en la transición para el final)
+    .attr("r", PTS_R_STEP4)
     .attr("fill", d => colorWinner(d))
     .attr("fill-opacity", 0.95)
     .attr("stroke", "#111")
     .attr("stroke-opacity", 0.9)
-    .attr("stroke-width", 0.9)
-    .attr("vector-effect", "non-scaling-stroke")
-    .style("pointer-events", "all");
+    .attr("stroke-width", 0.9);
+}
 
-  // FORZAR radio final *sin transición* (parche anti-interrupción)
-  ent.merge(sel)
-     .interrupt()                 // cancela cualquier transición previa en curso
-     .attr("opacity", 1)
-     .attr("r", PTS_R_STEP4)      // <-- clave: radio inmediato
-     .attr("visibility", "visible");
+// ---- Step 4: dibujar puntos (idempotente) y resetear estado
+export async function showPointsStep4(){
+  await ensurePuestosData();
 
-  sel.exit().remove();
+  // Fondo de mapa en contorno
+  gMap.style("display", null).transition().duration(400).attr("opacity", 1);
+  gMap.selectAll("path")
+    .transition().duration(400)
+    .attr("fill","none")
+    .attr("stroke","#020202ff")
+    .attr("pointer-events","none");
 
-  console.log("[step4] circles enter:", ent.size(), "total:", gPts.selectAll("circle").size());
+  // Capa de puntos visible y por encima del mapa
+  gPts.interrupt().style("display", null).attr("opacity", 1).raise();
+  gMap.lower();
 
-  bindPointEvents();
+  // 1) Crear círculos SOLO la primera vez
+  if (!pointsDrawnOnce) {
+    const sel = gPts.selectAll("circle").data(nodes, d => d.id);
+
+    const ent = sel.enter().append("circle")
+      .attr("r", 0)
+      .attr("cx", d => d.x0)
+      .attr("cy", d => d.y0)
+      .attr("fill", d => colorWinner(d))
+      .attr("fill-opacity", 0.95)
+      .attr("stroke", "#111")
+      .attr("stroke-opacity", 0.9)
+      .attr("stroke-width", 0.9)
+      .style("pointer-events", "all")
+      .transition().duration(350)
+      .attr("r", PTS_R_STEP4);
+
+    sel.exit().remove();
+
+    // Una sola vez: ligar tooltips/interacciones
+    bindPointEvents();
+
+    pointsDrawnOnce = true;
+    console.log("[step4] circles enter:", ent.size(), "total:", gPts.selectAll("circle").size());
+  } else {
+    // Si ya estaban, asegúrate de que están visibles
+    gPts.selectAll("circle").interrupt().transition().duration(150).attr("opacity", 1);
+  }
+
+  // 2) Detén la simulación y restaura posiciones originales para “puntos”
+  if (simulation) {
+    simulation.alpha(0);    // sin energía
+    simulation.stop();      // NO fuerzas activas en step 4
+  }
+  resetNodesToOrigin();
+
+  // 3) aplicar filtro por territorio si estuviera activo
   applyTerritoryFilter();
-  clearLegends(); gUI.style("display","none");
+
+  // 4) leyendas/UI fuera en este step
+  clearLegends();
+  gUI.style("display","none");
 }
 
 export function forceSeparateStep5(){
-  if (!simulation || !rScale) return;
+  if (!simulation) return;
+
+  // Asegura estado visual correcto antes de iniciar fuerzas
+  gPts.interrupt().style("display", null).attr("opacity", 1).raise();
+  resetNodesToOrigin();
 
   // Asegura z-order y visibilidad del layer de puntos
   gMap.lower();
@@ -578,16 +704,17 @@ export function forceSeparateStep5(){
     .attr("r", d => rScale(d.total))      // tamaño ∝ TOTAL_VOTOS
     .attr("fill", d => colorByMargin(d))  // color por margen (como Step 3)
     .attr("fill-opacity", 0.95)
-    .attr("stroke", "#111")
+    .attr("stroke", "#1f1e1eff")
     .attr("stroke-opacity", 0.9)
     .attr("stroke-width", 0.9);
 
   // Fuerzas: colisión en función del radio actual y anclas a su x0,y0
   simulation
-    .force("collide", d3.forceCollide(d => rScale(d.total) + COLL_PAD))
-    .force("x", d3.forceX(d => d.x0).strength(0.20))
-    .force("y", d3.forceY(d => d.y0).strength(0.20))
-    .alpha(0.8).restart();
+    .force("collide", d3.forceCollide(PTS_R_STEP4 + COLL_PAD))
+    .force("x", d3.forceX(d => d.x0).strength(0.25))
+    .force("y", d3.forceY(d => d.y0).strength(0.25))
+    .alpha(0.9)
+    .restart();
 
   // Tooltips y filtro por territorio siguen funcionando
   bindPointEvents();
@@ -634,6 +761,8 @@ export function centerAllStep7(){
     .alpha(0.8).restart();
 
   clearLegends(); gUI.style("display","none");
+  hideXAxis();
+if (simulation) simulation.force("sideLock", null);
 }
 
 // --------------------------- DISPOSICIONES EXTRA (Steps 8–10)
@@ -643,30 +772,27 @@ export function reorderXByMargin(){
   if (!nodes?.length || !simulation) return;
   hideClusterLabels();
 
-  // Tomamos el máximo valor absoluto de la diferencia Eder-Ortiz (firmada)
-  const maxAbs = d3.max(nodes, d => Math.abs(
-    d.diffEO != null ? d.diffEO :
-    ((d.pctEder ?? 0) - (d.pctOrtiz ?? 0))
-  )) || 1e-6;
+  // dominio simétrico alrededor de 0 (margen con signo)
+  const maxAbs = d3.max(nodes, d => Math.abs(d.signedMargin ?? 0)) || 0.001;
+  const padSide = 80;
+  const x = d3.scaleLinear().domain([-maxAbs, maxAbs]).range([padSide, width-padSide]);
 
-  const pad = 80; // margen a los lados
-  const x = d3.scaleLinear()
-    .domain([-maxAbs, maxAbs])     // simétrico (izq: Ortiz, der: Eder)
-    .range([pad, width - pad]);
-
+  // Fuerzas: X por margen con signo, ligera Y al centro (evita que crucen “por arriba”)
   simulation
-    .force("x", d3.forceX(d => {
-      const signed = (d.diffEO != null)
-        ? d.diffEO
-        : ((d.pctEder ?? 0) - (d.pctOrtiz ?? 0));
-      return x(signed);
-    }).strength(0.30))
-    // mantenemos y más o menos centrado para el “abanico”
-    .force("y", d3.forceY(height/2).strength(0.06))
+    .velocityDecay(0.4)
+    .force("x", d3.forceX(d => x(d.signedMargin || 0)).strength(0.5))
+    .force("y", d3.forceY(height/2).strength(0.02))
+    // bloqueo de lado según ganador (¡clave!)
+    .force("sideLock", forceSideLockFactory(x(0), 6))
     .alpha(0.9).restart();
+
+  // Dibuja/actualiza el eje
+  showXAxisForMargin(x);
 
   bindPointEvents();
 }
+
+
 
 export function reorderYByTotal(){
   if (!nodes?.length || !simulation) return;
@@ -681,6 +807,8 @@ export function reorderYByTotal(){
 
   bindPointEvents();
   applyTerritoryFilter();   // <--
+  hideXAxis();
+//if (simulation) simulation.force("sideLock", null); 
 }
 export function clusterByWinnerLabeled(){
   if (!nodes?.length || !simulation) return;
@@ -690,6 +818,8 @@ export function clusterByWinnerLabeled(){
     if (w === normalizeTxt("ALVARO ALEJANDRO EDER GARCES")) return "Eder";
     if (w === normalizeTxt("ROBERTO ORTIZ URUEÑA"))       return "Ortiz";
     return "Otros";
+    hideXAxis();
+if (simulation) simulation.force("sideLock", null);  
   })));
 
   const x = d3.scaleBand().domain(winners).range([80, width-80]).padding(0.25);
